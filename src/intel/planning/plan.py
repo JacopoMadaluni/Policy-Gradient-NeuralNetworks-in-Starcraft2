@@ -1,5 +1,4 @@
-
-from .units import getUnits
+from ...utils.units import getUnits
 class Plan:
 
     
@@ -7,7 +6,7 @@ class Plan:
         """
         Assumes goal to be a unit
         """
-        self.units = getUnits(agent)
+        self.units = getUnits()
         self.agent = agent
         self.plan  = []
         self.readyToProceed = True
@@ -34,17 +33,17 @@ class Plan:
     def unlock(self):
         self.readyToProceed = True
 
-    async def executeNextAction(self):
+    async def execute_next_step(self):
         if not self.readyToProceed:
             return
         nextGoal = self.plan[-1]
         print("Next goal: {}".format(nextGoal))
         build  = self.units.protossUnits[nextGoal]["buildFunction"]
         success = await build(nextGoal, self.unlock, True)
-        if success == 2:
-            print("plan in progress...")
-            self.readyToProceed = False
-        elif success == True:
+        #if success == 2:
+        #    print("plan in progress...")
+        #    self.readyToProceed = False
+        if success == True:
             self.readyToProceed = False
             self.plan.pop()    
 

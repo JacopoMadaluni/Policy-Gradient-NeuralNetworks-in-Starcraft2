@@ -1,17 +1,15 @@
 import sc2
 import random
-from sc2 import run_game, maps, Race, Difficulty
+from sc2 import run_game, maps, Race, Difficulty, position
 from sc2.player import Bot, Computer
-import sc2.constants
-from sc2.constants import NEXUS, PROBE, PYLON, ASSIMILATOR, GATEWAY, CYBERNETICSCORE, STALKER, STARGATE, VOIDRAY, SENTRY, WARPGATE, RESEARCH_WARPGATE, \
-                    WARPGATETRAIN_STALKER, AbilityId
-
-from sc2.constants import PROBE, ZEALOT, SENTRY, STALKER, ADEPT, HIGHTEMPLAR, DARKTEMPLAR, ARCHON, OBSERVER, WARPPRISM, IMMORTAL, \
-                        COLOSSUS, DISRUPTOR, PHOENIX, VOIDRAY, ORACLE, TEMPEST, CARRIER, MOTHERSHIP                    
-
-from utils.units import Units                    
-from utils.plan import Plan
-from utils.logic import getLogic
+               
+from src.utils.initializer         import *               
+from src.utils.constants           import *
+from src.utils.units               import Units                    
+from src.intel.planning.plan       import Plan
+from src.intel.planning.planner    import Planner
+from src.utils.logic               import getLogic
+from src.intel.visualizer          import Visualizer
 
 
 # 165 iterations per minute
@@ -32,18 +30,21 @@ class AlphaStar(sc2.BotAI):
             
             
 
-        if getLogic(self).canBuildColossus():
+        if getLogic(self).can_build(COLOSSUS):
             print("Plan goal achieved!")
             await getLogic(self).buildColossus()
 
     def __init__(self):
         self.ITERATIONS_PER_MINUTE = 165
         self.MAX_WORKERS = 80
+        """ INITIALIZATION """
+        init_logic_modules(self)
 
-        self.units_logic = Units(self)
         self.plan = None
-        
-        
+        self.planner = Planner(self)
+
+        self.visualizer = Visualizer(self)
+         
 
 
 
@@ -56,11 +57,13 @@ class AlphaStar(sc2.BotAI):
         }
 
     async def on_step(self, iteration):
-        await self.testing()
-        #self.iteration = iteration
-        #self.current_minute = iteration / self.ITERATIONS_PER_MINUTE      
-        #await self.modes[self.current_mode]()
-        #self.current_mode = (self.current_mode + 1) % 3
+        #await self.testing()
+        self.visualizer.draw_information()
+        self.iteration = iteration
+        self.current_minute = iteration / self.ITERATIONS_PER_MINUTE      
+        await self.modes[self.current_mode]()
+        await self.scout()
+        self.current_mode = (self.current_mode + 1) % 3
 
     async def economy_mode(self):
         await self.build_workers()
@@ -73,7 +76,7 @@ class AlphaStar(sc2.BotAI):
         await self.advance_tech()
         await self.research_upgrades()
         await self.build_army()
-        await self.warp_army()
+        await self.warp_army()    
 
     async def attack_mode(self):
         await self.attack()    
@@ -89,7 +92,7 @@ class AlphaStar(sc2.BotAI):
             nexuses = self.units(NEXUS).ready
             if nexuses.exists:
                 if self.can_afford(PYLON):
-                    await self.build(PYLON, near=nexuses.first)
+                    await self.build(PYLON, near=nexuses.first, max_distance=40)
 
     async def build_assimilators(self):
         for nexus in self.units(NEXUS).ready:
@@ -102,6 +105,49 @@ class AlphaStar(sc2.BotAI):
                     if not worker:
                         break
                     await self.do(worker.build(ASSIMILATOR, vespene))
+
+    def random_location_variance(self, enemy_start_location):
+        x = enemy_start_location[0]
+        y = enemy_start_location[1]
+
+        x += ((random.randrange(-20, 20))/100) * enemy_start_location[0]
+        y += ((random.randrange(-20, 20))/100) * enemy_start_location[1]
+
+        if x < 0:
+            x = 0
+        if y < 0:
+            y = 0
+        if x > self.game_info.map_size[0]:
+            x = self.game_info.map_size[0]
+        if y > self.game_info.map_size[1]:
+            y = self.game_info.map_size[1]
+
+        go_to = position.Point2(position.Pointlike((x,y)))
+        return go_to                
+
+    async def scout(self):
+        if len(self.units(OBSERVER)) > 0:
+            scout = self.units(OBSERVER)[0]
+            if scout.is_idle:
+                enemy_location = self.enemy_start_locations[0]
+                move_to = self.random_location_variance(enemy_location)
+                print(move_to)
+                await self.do(scout.move(move_to))
+
+        else:
+            """ Build observer """
+            if self.units(ROBOTICSFACILITY).ready.exists:
+                for rf in self.units(ROBOTICSFACILITY).ready.noqueue:
+                    if self.can_afford(OBSERVER) and self.supply_left > 0:
+                        await self.do(rf.train(OBSERVER))
+                        break
+            elif self.planner.exists_plan_for(OBSERVER):
+                await self.planner.advance(OBSERVER)
+            else:
+                self.planner.generate_new_plan(OBSERVER)
+
+            
+
 
     async def expand(self):
         if self.units(NEXUS).amount < 3 and self.can_afford(NEXUS):
@@ -176,8 +222,7 @@ class AlphaStar(sc2.BotAI):
     async def attack(self):
         # {UNIT : [n to attack, n to defend]}
         army = {STALKER : [15, 1],
-                VOIDRAY : [8, 1],
-                SENTRY : [0, 0]}
+                VOIDRAY : [8, 1]}
 
         for UNIT in army:
             if self.units(UNIT).amount > army[UNIT][0]:
@@ -201,5 +246,5 @@ class AlphaStar(sc2.BotAI):
 
 if __name__ == "__main__":
     run_game(maps.get("AbyssalReefLE"),
-            [Bot(Race.Protoss, AlphaStar()), Computer(Race.Terran, Difficulty.Hard)],
+            [Bot(Race.Protoss, AlphaStar()), Computer(Race.Terran, Difficulty.Easy)],
             realtime=False)

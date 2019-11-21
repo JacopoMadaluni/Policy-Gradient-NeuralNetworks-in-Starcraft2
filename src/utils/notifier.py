@@ -18,6 +18,6 @@ class Notifier(threading.Thread):
                 self.callback()
                 break
             else:
-                time.sleep(5)
+                time.sleep(2)
         print("Killing notifier")        
 

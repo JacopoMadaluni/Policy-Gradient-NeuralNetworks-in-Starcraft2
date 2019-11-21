@@ -1,25 +1,31 @@
-from sc2.constants import PROBE, ZEALOT, SENTRY, STALKER, ADEPT, HIGHTEMPLAR, DARKTEMPLAR, ARCHON, OBSERVER, WARPPRISM, IMMORTAL, \
-                        COLOSSUS, DISRUPTOR, PHOENIX, VOIDRAY, ORACLE, TEMPEST, CARRIER, MOTHERSHIP
-
-from sc2.constants import NEXUS, PYLON, ASSIMILATOR, GATEWAY, FORGE, CYBERNETICSCORE, SHIELDBATTERY, TWILIGHTCOUNCIL, ROBOTICSFACILITY, \
-                    STARGATE, TEMPLARARCHIVE, ROBOTICSBAY, DARKSHRINE, PHOTONCANNON, FLEETBEACON                        
-
-from sc2.constants import MARINE, MARAUDER, REAPER, GHOST, HELLION, WIDOWMINE, SIEGETANK, CYCLONE, THOR, VIKING, MEDIVAC, LIBERATOR, \
-                        BANSHEE, RAVEN, BATTLECRUISER
-
+from .constants import *
 from .notifier import Notifier
+
 class Logic:
 
     def __init__(self, agent):
+        from .units import getUnits
         self.agent = agent
+        self.units = getUnits()
+
+    def test(function):
+        def f(*args, **kwargs):
+            rv = function(args, kwargs)
+            if rv and kwargs.postAction is not None:
+                condition = lambda: agent.units(structure).ready.exists
+                notifier = Notifier(condition, postAction)
+                notifier.start()
+            return rv
+        return f        
 
 
 
-    async def buildStructure(self, structure, postAction=None, plan=False, pylon=None):
+
+    async def build_structure(self, structure, postAction=None, plan=False, pylon=None):
         agent = self.agent
         #if plan and agent.units(structure).not_ready.exists:
         #    return 2
-
+        
         if agent.units(PYLON).ready.exists:
             if not pylon:
                 pylon = agent.units(PYLON).ready.random    
@@ -32,7 +38,7 @@ class Logic:
                 return True
         return False        
 
-    async def buildColossus(self):
+    """async def build_colossus(self):
         agent = self.agent
         # TODO for loop ?
         for roboticsFacility in agent.units(ROBOTICSFACILITY).ready.idle:
@@ -40,11 +46,32 @@ class Logic:
                     agent.supply_left >= 4):
                 await agent.do(roboticsFacility.train(COLOSSUS))
                 return True
-        return False        
+        return False    """
+
+    async def build_unit(self, unit):
+        agent = self.agent
+        supply_needed = self.units.protossUnits[unit]["supply"]
+        target_structure = self.units.protossUnits[unit]["builtIn"]
+        for structure in agent.units(target_structure).ready.idle:
+            if (agent.can_afford(unit) and
+                agent.supply_left >= supply_needed):
+                await agent.do(target_structure.train(unit))
+                return True
+        return False       
+
+    def can_build_archon(self):
+        # TODO obvs
+        return False     
 
 
-    def canBuildColossus(self):
-        return self.agent.units(ROBOTICSBAY).ready.exists and self.agent.units(ROBOTICSFACILITY).ready.exists
+
+    def can_build(self, unit):
+        structure_required = self.units.protossUnits[unit]["builtIn"]
+        tech_required = self.units.protossUnits[unit]["required"]
+        if tech_required:
+            return self.agent.units(structure_required).ready.exists and self.agent.units(tech_required).ready.exists
+        else:
+            return self.agent.units(structure_required).ready.exists  
 
 logic = None
 def getLogic(agent):
