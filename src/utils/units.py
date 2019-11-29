@@ -1,5 +1,3 @@
-import asyncio
-
 from sc2.constants import PROBE, ZEALOT, SENTRY, STALKER, ADEPT, HIGHTEMPLAR, DARKTEMPLAR, ARCHON, OBSERVER, WARPPRISM, IMMORTAL, \
                         COLOSSUS, DISRUPTOR, PHOENIX, VOIDRAY, ORACLE, TEMPEST, CARRIER, MOTHERSHIP
 
@@ -63,7 +61,7 @@ class Units():
             },
             HIGHTEMPLAR: {
                 "type": "unit",
-                "supply": 4,
+                "supply": 2,
                 "counters": set([SIEGETANK, GHOST]),
                 "builtIn": GATEWAY,
                 "canBuildFunction": lambda: self.logic.can_build(HIGHTEMPLAR),
@@ -71,7 +69,7 @@ class Units():
             },
             DARKTEMPLAR: {
                 "type": "unit",
-                "supply": 4,
+                "supply": 2,
                 "counters": set([SIEGETANK, BANSHEE]),
                 "builtIn": GATEWAY,
                 "canBuildFunction": lambda: self.logic.can_build(DARKTEMPLAR),

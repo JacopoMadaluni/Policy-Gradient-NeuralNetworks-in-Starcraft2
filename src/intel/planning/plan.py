@@ -1,13 +1,14 @@
 from ...utils.units import getUnits
+from ...utils.function_utils import agent_method
+
 class Plan:
 
     
-    def __init__(self, agent, goal):
+    def __init__(self, goal):
         """
         Assumes goal to be a unit
         """
         self.units = getUnits()
-        self.agent = agent
         self.plan  = []
         self.readyToProceed = True
 
@@ -18,7 +19,6 @@ class Plan:
         return len(self.plan)
 
     def initializePlan(self, goal):
-        #self.plan.append(goal)
         print("Initializing plan for: {}".format(goal))
         currentSubGoal = goal
         while True:
@@ -33,16 +33,19 @@ class Plan:
     def unlock(self):
         self.readyToProceed = True
 
-    async def execute_next_step(self):
+    @agent_method
+    async def execute_next_step(self, agent=None):
         if not self.readyToProceed:
             return
         nextGoal = self.plan[-1]
+        if agent.units(nextGoal).ready.exists:
+            self.plan.pop()
+            return
+
         print("Next goal: {}".format(nextGoal))
         build  = self.units.protossUnits[nextGoal]["buildFunction"]
         success = await build(nextGoal, self.unlock, True)
-        #if success == 2:
-        #    print("plan in progress...")
-        #    self.readyToProceed = False
+ 
         if success == True:
             self.readyToProceed = False
             self.plan.pop()    

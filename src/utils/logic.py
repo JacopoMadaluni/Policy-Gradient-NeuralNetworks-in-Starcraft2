@@ -8,16 +8,15 @@ class Logic:
         self.agent = agent
         self.units = getUnits()
 
-    def test(function):
-        def f(*args, **kwargs):
-            rv = function(args, kwargs)
-            if rv and kwargs.postAction is not None:
-                condition = lambda: agent.units(structure).ready.exists
-                notifier = Notifier(condition, postAction)
-                notifier.start()
-            return rv
-        return f        
-
+    def post_action(function):
+        async def f(*args, **kwargs):
+            return_value = function(*args, **kwargs)
+            if return_value and "postAction" in kwargs:
+                kwargs["postAction"]()
+            if not return_value and "failureAction" in kwargs:
+                kwargs["failureAction"]()    
+            return return_value
+        return f         
 
 
 
