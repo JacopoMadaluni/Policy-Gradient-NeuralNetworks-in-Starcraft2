@@ -9,52 +9,12 @@ import matplotlib.pyplot as plt
 from sc2 import run_game, maps, Race, Difficulty, position, Result
 from sc2.player import Bot, Computer
 from PolicyGradient import PolicyGradientAgent
+from Simulations import SimpleSimulation
 
 
 
 
-# 165 iterations per minute
-
-class SimulatorAgent(sc2.BotAI):
-
-
-    def __init__(self, observation):
-        self.ITERATIONS_PER_MINUTE = 165
-        self.HEADLESS = False
-
-        self.n_zealots   = observation[0]
-        self.n_stalkers  = observation[1]
-        self.n_immortals = observation[2]
-
-        self.n_marines = observation[3]
-        self.n_marauders = observation[4]
-        self.n_tanks = observation[5]
-        self.n_banshees = observation[6]
-
-    async def on_start_async(self):
-        await self.chat_send("let us begin!")
-        await self.chat_send("-marine {}".format(self.n_marines))
-        await self.chat_send("-marauder {}".format(self.n_marauders))
-        await self.chat_send("-stank {}".format(self.n_tanks))
-        await self.chat_send("-banshee {}".format(self.n_banshees))
-
-
-        await self.chat_send("-zealot {}".format(self.n_zealots))
-        await self.chat_send("-stalker {}".format(self.n_stalkers))
-        await self.chat_send("-immortal {}".format(self.n_immortals))
-        await self.chat_send("-begin")
-
-
-    async def on_step(self, iteration):
-        pass
-
-    def on_end(self, result):
-        print("Game ended")
-        print("Result: {}".format(result))
-        if result == Result.Victory:
-            return 1
-        else:
-            return 0    
+   
 
 class Simulation():
 
@@ -103,7 +63,7 @@ class Simulation():
     def simulate_exchange(self):
         result = run_game(maps.get("TrainingEnvironment"),
             [Bot(Race.Protoss, SimulatorAgent(self.current_observation)), Computer(Race.Terran, Difficulty.Easy)],
-            realtime=False)   
+            realtime=True)   
         if result == Result.Victory:
             return 1
         else:
@@ -124,19 +84,19 @@ def plotLearning(scores, filename, x=None, window=5):
 
 if __name__ == "__main__":
     agent = PolicyGradientAgent(ALPHA=0.0005, input_dims=7, GAMMA=0.99,
-                                n_actions=3, layer1_size=64, layer2_size=64,
+                                n_actions=4, layer1_size=64, layer2_size=64,
                                 chkpt_dir='tmp/')
     #agent.load_checkpoint()
     score_history = []
     score = 0
-    num_episodes = 3
+    num_episodes = 1000
     #env = wrappers.Monitor(env, "tmp/lunar-lander",
     #                        video_callable=lambda episode_id: True, force=True)
     for i in range(num_episodes):
         print('episode: ', i,'score: ', score)
         done = False
         score = 0
-        simulation = Simulation()
+        simulation = SimpleSimulation()
         observation = simulation.get_current_observation()
         while not done:
             action = agent.choose_action(observation)
