@@ -4,9 +4,11 @@ import time
 import numpy as np
 import math
 import matplotlib.pyplot as plt 
+import time
 from sc2 import run_game, maps, Race, Difficulty, position, Result
 from sc2.player import Bot, Computer
 from SimulatorAgent import SimulatorAgent
+
 
 class SimpleSimulation():
 
@@ -40,6 +42,7 @@ class SimpleSimulation():
         print("Enemy supply: {}".format(self.total_supply))
         self.current_supply = 0
         self.ready = False
+  
 
     def initialize_in_game_simulation_commands(self):
         for u, n in zip(self.unit_namespace, self.current_observation):
@@ -71,14 +74,20 @@ class SimpleSimulation():
                 self.ready = True    
 
         #observation_, reward, done, info         
-        return self.get_current_observation(), 0, self.ready, ""        
+        return self.get_current_observation(), 0, self.ready, ""    
+
+    def on_end(self, result):
+        self.result = result        
 
 
     def simulate_exchange(self):
         result = run_game(maps.get("TrainingEnvironment"),
-            [Bot(Race.Protoss, SimulatorAgent(self.current_observation, self.total_supply, self.commands)), Computer(Race.Terran, Difficulty.Easy)],
+            [Bot(Race.Protoss, SimulatorAgent(self.current_observation, self.total_supply, self.commands, self.on_end)), Computer(Race.Terran, Difficulty.Easy)],
             realtime=False)   
-        if result == Result.Victory:
-            return 1
-        else:
-            return -1
+
+        #if result == Result.Victory:
+        #    return 1
+        #else:
+        #    return -1
+        return self.result
+

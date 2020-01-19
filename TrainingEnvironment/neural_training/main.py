@@ -6,10 +6,12 @@ import time
 import numpy as np
 import math
 import matplotlib.pyplot as plt 
+import threading
 from sc2 import run_game, maps, Race, Difficulty, position, Result
 from sc2.player import Bot, Computer
 from PolicyGradient import PolicyGradientAgent
 from Simulations import SimpleSimulation
+
 
 
 
@@ -82,14 +84,15 @@ def plotLearning(scores, filename, x=None, window=5):
     plt.plot(x, running_avg)
     plt.savefig(filename)
 
-if __name__ == "__main__":
+
+if __name__ == "__main__":    
     agent = PolicyGradientAgent(ALPHA=0.0005, input_dims=7, GAMMA=0.99,
                                 n_actions=4, layer1_size=64, layer2_size=64,
                                 chkpt_dir='tmp/')
     #agent.load_checkpoint()
     score_history = []
     score = 0
-    num_episodes = 1000
+    num_episodes = 50
     #env = wrappers.Monitor(env, "tmp/lunar-lander",
     #                        video_callable=lambda episode_id: True, force=True)
     for i in range(num_episodes):
@@ -106,14 +109,14 @@ if __name__ == "__main__":
             observation = observation_
             score += reward
 
-        score = simulation.simulate_exchange()    
+        score = simulation.simulate_exchange()   
 
         print("Result: {}".format(score))
         score_history.append(score)
         agent.learn()
         
         
-        agent.save_checkpoint()
+        agent.save_checkpoint() 
     filename = 'testing.png'
     plotLearning(score_history, filename=filename, window=25)
 
