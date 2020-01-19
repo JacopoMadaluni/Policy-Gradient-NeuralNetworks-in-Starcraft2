@@ -3,7 +3,7 @@ import tensorflow.compat.v1 as tf
 import numpy as np
 import ctypes
 
-hllDll = ctypes.WinDLL("C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v10.0\\bin\\cudart64_100.dll")
+#hllDll = ctypes.WinDLL("C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v10.0\\bin\\cudart64_100.dll")
 
 class PolicyGradientAgent():
     def __init__(self, ALPHA, GAMMA=0.95, n_actions=4,

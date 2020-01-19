@@ -5,7 +5,7 @@ import random
 import time
 import numpy as np
 import math
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
 from sc2 import run_game, maps, Race, Difficulty, position, Result
 from sc2.player import Bot, Computer
 from info import terran_units
@@ -31,13 +31,13 @@ class SimulatorAgent(sc2.BotAI):
             self.n_marauders = observation[4]
             self.n_tanks = observation[5]
             self.n_banshees = observation[6]
-        
+
 
     async def on_start_async(self):
         if self.commands:
             for command in self.commands:
                 await self.chat_send(command)
-        else:        
+        else:
             await self.chat_send("let us begin!")
             await self.chat_send("-marine {}".format(self.n_marines))
             await self.chat_send("-marauder {}".format(self.n_marauders))
@@ -55,10 +55,10 @@ class SimulatorAgent(sc2.BotAI):
         self.compute_enemy_supply_belief()
 
     def normalize_supply_left(self, leftover):
-        return leftover/self.initial_supply     
+        return leftover/self.initial_supply
 
     def compute_enemy_supply_belief(self):
-        enemy_leftover_supply = 0       
+        enemy_leftover_supply = 0
         for unit in self.known_enemy_units:
             u_type = unit.type_id
             enemy_leftover_supply += self.terran_units_info[u_type]["supply"]
@@ -75,7 +75,7 @@ class SimulatorAgent(sc2.BotAI):
         else:
             # How much army does enemy have left
             reward = (-1) * self.normalize_supply_left(self.compute_enemy_supply_belief())
-            return 0 
+            return 0
 
 
 class ContinuousSimulatorAgent(sc2.BotAI):
@@ -97,19 +97,19 @@ class ContinuousSimulatorAgent(sc2.BotAI):
             self.n_marines = observation[3]
             self.n_marauders = observation[4]
             self.n_tanks = observation[5]
-            self.n_banshees = observation[6]    
+            self.n_banshees = observation[6]
 
     def simulation(self):
-        
+        pass
 
-        
-        
+
+
 
     async def on_start_async(self):
         if self.commands:
             for command in self.commands:
                 await self.chat_send(command)
-        else:        
+        else:
             await self.chat_send("let us begin!")
             await self.chat_send("-marine {}".format(self.n_marines))
             await self.chat_send("-marauder {}".format(self.n_marauders))
@@ -127,10 +127,10 @@ class ContinuousSimulatorAgent(sc2.BotAI):
         self.compute_enemy_supply_belief()
 
     def normalize_supply_left(self, leftover):
-        return leftover/self.initial_supply     
+        return leftover/self.initial_supply
 
     def compute_enemy_supply_belief(self):
-        enemy_leftover_supply = 0       
+        enemy_leftover_supply = 0
         for unit in self.known_enemy_units:
             u_type = unit.type_id
             enemy_leftover_supply += self.terran_units_info[u_type]["supply"]
@@ -147,4 +147,4 @@ class ContinuousSimulatorAgent(sc2.BotAI):
         else:
             # How much army does enemy have left
             reward = (-1) * self.normalize_supply_left(self.compute_enemy_supply_belief())
-            return 0             
+            return 0
