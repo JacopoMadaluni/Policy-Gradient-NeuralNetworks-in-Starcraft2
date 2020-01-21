@@ -25,6 +25,10 @@ class PolicyGradientAgent():
         self.saver = tf.train.Saver()
         self.checkpoint_file = os.path.join(chkpt_dir,'policy_network.ckpt')
 
+    def __repr__(self):
+        return "ALPHA: {}\nGAMMA: {}\nn_actions: {}\nL1: {}\nL2: {}\ninput_dims: {}".format(self.lr,
+                            self.gamma, self.n_actions, self.layer1_size, self.layer2_size, self.input_dims)
+
     def build_net(self):
         tf.disable_eager_execution()
         with tf.variable_scope('parameters'):
@@ -70,7 +74,7 @@ class PolicyGradientAgent():
         self.reward_memory.append(reward)
 
     def finish_transition_group(self, reward):
-        self.reward_memory[-1] = reward    
+        self.reward_memory[-1] = reward
 
     def learn(self):
         state_memory = np.array(self.state_memory)
