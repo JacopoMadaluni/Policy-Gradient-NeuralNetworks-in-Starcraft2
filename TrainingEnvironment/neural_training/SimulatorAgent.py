@@ -10,11 +10,7 @@ import threading
 from sc2 import run_game, maps, Race, Difficulty, position, Result
 from sc2.player import Bot, Computer
 from info import terran_units
-from flask import Flask
-from flask_socketio import SocketIO, emit
-import logging
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
+
 
 class SimulatorAgent(sc2.BotAI):
 
@@ -84,7 +80,3 @@ class SimulatorAgent(sc2.BotAI):
             # How much army does enemy have left
             reward = (-1) * self.normalize_supply_left(self.compute_enemy_supply_belief())
             self.submit_reward(reward)
-
-
-
-

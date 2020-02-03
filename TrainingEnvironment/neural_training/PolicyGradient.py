@@ -69,10 +69,15 @@ class PolicyGradientAgent():
         self.action_memory.append(action)
         self.reward_memory.append(reward)
 
+    def finish_transition_group(self, reward):
+        self.reward_memory[-1] = reward    
+
     def learn(self):
         state_memory = np.array(self.state_memory)
         action_memory = np.array(self.action_memory)
         reward_memory = np.array(self.reward_memory)
+
+        print("Reward Memory: {}".format(self.reward_memory))
 
         G = np.zeros_like(reward_memory)
         for t in range(len(reward_memory)):
@@ -85,6 +90,8 @@ class PolicyGradientAgent():
         mean = np.mean(G)
         std = np.std(G) if np.std(G) > 0 else 1
         G = (G - mean) / std
+
+        print("G: {}".format(G))
 
         _ = self.sess.run(self.train_op,
                             feed_dict={self.input: state_memory,
