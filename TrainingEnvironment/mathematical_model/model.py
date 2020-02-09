@@ -4,6 +4,9 @@ class ArmyCompModel:
 
     def __init__(self, enemy_units):
         self.enemy_units = enemy_units
+        print("------")
+        print(enemy_units)
+        print("------")
 
         self.enemy_unit_types = []
         self.init_enemy_unit_types()
@@ -32,18 +35,18 @@ class ArmyCompModel:
 
 
     def compute_utility(self, unit):
-        utility = 1
+        utility = 0
         for e in self.enemy_units:
             u      = e[0]
             amount = e[1]
-            utility *= self.protoss_units[unit]["utility_against"][u] * amount
-        return utility       
+            utility += self.protoss_units[unit]["utility_against"][u] * amount
+        return utility
 
     def init_protoss_units_by_utility(self):
         for unit in self.protoss_units:
             self.sort_append(unit, self.compute_utility(unit))
 
-        self.normalize_utilities()    
+        self.normalize_utilities()
 
     def normalize_utilities(self):
         total = 0
@@ -51,7 +54,7 @@ class ArmyCompModel:
             total += e[1]
 
         for e in self.units:
-            e[1] = e[1]/total    
+            e[1] = e[1]/total
 
     def get_percentage_of(self, unit):
         """
@@ -65,6 +68,12 @@ class ArmyCompModel:
         """
         return ""
 
+    def utility_of(self, unit_tag):
+        for e in self.units:
+            if e[0] == unit_tag:
+                return e[1]
+        return None
+
     def get_army_comp(self):
         countered_units = set()
         table = get_protoss_units()
@@ -77,12 +86,10 @@ class ArmyCompModel:
                     countered_units.add(c)
                     percentage_of_c = self.get_percentage_of(c)
                     percentage += percentage_of_c
-            composition.append((unit, percentage))   
+            composition.append((unit, percentage))
 
             # break condition if we countered all enemy units
             if len(countered_units) == len(self.enemy_units):
-                break     
+                break
 
-        return self.normalize_percentages(composition)        
-
-
+        return self.normalize_percentages(composition)

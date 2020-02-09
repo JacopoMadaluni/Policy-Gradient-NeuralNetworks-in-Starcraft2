@@ -2,11 +2,14 @@
 
 from mathematical_model.model import ArmyCompModel
 from evaluator import army_generator
+from neural_training.Simulations import *
+
+# TOSS UNITS
+from sc2.constants import PROBE, ZEALOT, SENTRY, STALKER, ADEPT, HIGHTEMPLAR, DARKTEMPLAR, ARCHON, OBSERVER, WARPPRISM, IMMORTAL, \
+                        COLOSSUS, DISRUPTOR, PHOENIX, VOIDRAY, ORACLE, TEMPEST, CARRIER, MOTHERSHIP
 
 
 if __name__ == "__main__":
-    enemy_army = army_generator.bio_army(30)
-    model = ArmyCompModel(enemy_army)
-    print(model.enemy_units)   
-    print(model.enemy_unit_types)    
-    print(model.units)       
+    sim = SimpleSimulation()
+    model = sim.model
+    print(model.utility_of(PHOENIX))

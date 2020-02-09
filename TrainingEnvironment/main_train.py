@@ -7,6 +7,7 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 import threading
+import os
 from sc2 import run_game, maps, Race, Difficulty, position, Result
 from sc2.player import Bot, Computer
 from neural_training.PolicyGradient import PolicyGradientAgent
@@ -85,16 +86,46 @@ def plotLearning(scores, filename, x=None, window=5):
     plt.savefig(filename)
 
 
+def get_user_inputs(checkpoints_dir):
+    simulation_location = input("Choose save location \n> ")
+    load_checkpoint = False
+    full_dir_location = os.path.join(os.path.abspath(os.getcwd()), checkpoints_dir, simulation_location)
+    if os.path.exists(full_dir_location):
+        if input("Do you want to load the previous checkpoint for this simulation? [y/n]\n> ") == "y":
+            load_checkpoint = True
+    if not load_checkpoint:
+        pass
+
+    return simulation_location, load_checkpoint
+
+def save_info(agent, win_loss, save_dir):
+    win_ratio = (win_loss[0]/(win_loss[0]+win_loss[1]))
+    with open(os.path.join(save_dir, "info"), "w+") as f:
+        f.write("{}\nWin ratio: {}".format(repr(agent), win_ratio))
+
+    graphname = os.path.join(save_dir, 'graph.png')
+    plotLearning(score_history, filename=graphname, window=25)
+
 if __name__ == "__main__":
-    agent = PolicyGradientAgent(ALPHA=0.0005, input_dims=7, GAMMA=0.99,
+    checkpoints_dir = "neural_training/checkpoints/"
+    simulation_location, load_checkpoint = get_user_inputs(checkpoints_dir)
+    simulation_dir = os.path.join(checkpoints_dir, simulation_location)
+
+
+
+    agent = PolicyGradientAgent(ALPHA=0.0001, input_dims=7, GAMMA=0.99,
                                 n_actions=4, layer1_size=49, layer2_size=49,
-                                chkpt_dir='tmp/')
-    #agent.load_checkpoint()
+                                chkpt_dir=simulation_dir)
+
+    if load_checkpoint:
+        agent.load_checkpoint()
+        print("Checkpoint successfully loaded")
+
     score_history = []
+    win_loss = [0, 0]
     score = 0
-    num_episodes = 1000
-    #env = wrappers.Monitor(env, "tmp/lunar-lander",
-    #                        video_callable=lambda episode_id: True, force=True)
+    num_episodes = int(input("How many simulations?\n> "))
+
     for i in range(num_episodes):
         print('episode: ', i,'score: ', score)
         done = False
@@ -103,7 +134,7 @@ if __name__ == "__main__":
         observation = simulation.get_current_observation()
         while not done:
             action = agent.choose_action(observation)
-            print(action)
+            print("Action chose: {}".format(action))
             observation_, reward, done, info = simulation.add_unit(action)
             agent.store_transition(observation, action, reward)
             observation = observation_
@@ -111,12 +142,17 @@ if __name__ == "__main__":
 
         score += simulation.simulate_exchange()
 
+        # Keep track of win/loss ratio
+        if score > 0:
+            win_loss[0] += 1
+        else:
+            win_loss[1] += 1
+
         print("Result: {}".format(score))
         agent.finish_transition_group(score)
         score_history.append(score)
         agent.learn()
 
-
         agent.save_checkpoint()
-    filename = 'testing.png'
-    plotLearning(score_history, filename=filename, window=25)
+
+    save_info(agent, win_loss, simulation_dir)

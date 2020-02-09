@@ -9,7 +9,7 @@ from sc2 import run_game, maps, Race, Difficulty, position, Result
 from sc2.player import Bot, Computer
 from .SimulatorAgent import SimulatorAgent
 from mathematical_model import model
-
+from info import *
 
 class SimpleSimulation():
 
@@ -42,8 +42,23 @@ class SimpleSimulation():
 
         self.total_supply = self.n_marauders * 2 + self.n_hellbats * 2 + self.n_banshees * 3
         print("Enemy supply: {}".format(self.total_supply))
+
+        self.model_input = None
+        self.init_model()
+
+        self.model = model.ArmyCompModel(self.model_input)
         self.current_supply = 0
         self.ready = False
+
+    def init_model(self):
+        self.model_input = []
+        if self.n_marauders != 0:
+            self.model_input.append([MARAUDER, self.n_marauders])
+        if self.n_hellbats != 0:
+            self.model_input.append([HELLIONTANK, self.n_hellbats])
+        if self.n_banshees != 0:
+            self.model_input.append([BANSHEE, self.n_banshees])
+
 
     def disable_normalization(self):
         self.normalize = False
@@ -82,22 +97,27 @@ class SimpleSimulation():
 
     def add_unit(self, unit):
         print("Action arrived: {}".format(unit))
+        reward = 0
         if unit == 0:
             self.n_zealots += 1
             self.current_supply += 2
             self.current_observation[0] += 1
+            reward = self.model.utility_of(ZEALOT) * 0.1
         elif unit == 1:
             self.n_stalkers += 1
             self.current_supply += 2
             self.current_observation[1] += 1
+            reward = self.model.utility_of(STALKER) * 0.1
         elif unit == 2:
             self.n_phoenixes += 1
             self.current_supply += 2
             self.current_observation[2] += 1
+            reward = self.model.utility_of(PHOENIX) * 0.1
         elif unit == 3:
             self.n_probes += 1
             self.current_supply += 1
             self.current_observation[3] += 1
+            reward = self.model.utility_of(PROBE) * 0.1
         else:
             print("####### NO ACTION CHOSE")
         if self.current_supply >= self.total_supply:
@@ -105,7 +125,7 @@ class SimpleSimulation():
                 self.ready = True
 
         #observation_, reward, done, info
-        return self.get_current_observation(), 0, self.ready, ""
+        return self.get_current_observation(), reward, self.ready, ""
 
     def on_end(self, result):
         self.result = result
