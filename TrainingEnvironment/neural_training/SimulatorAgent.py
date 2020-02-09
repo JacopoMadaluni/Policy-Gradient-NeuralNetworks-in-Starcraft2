@@ -76,6 +76,7 @@ class SimulatorAgent(sc2.BotAI):
             # How much army do I have left
             reward = self.normalize_supply_left(self.supply_army)
             self.submit_reward(reward)
+
         else:
             # How much army does enemy have left
             reward = (-1) * self.normalize_supply_left(self.compute_enemy_supply_belief())

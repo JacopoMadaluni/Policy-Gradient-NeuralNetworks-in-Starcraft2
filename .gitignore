@@ -6,6 +6,7 @@ __pycache__/
 # Additional Personal ignores
 testing/
 tmp/
+checkpoints/
 
 # C extensions
 *.so

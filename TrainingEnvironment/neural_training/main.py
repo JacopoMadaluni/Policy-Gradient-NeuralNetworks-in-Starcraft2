@@ -93,6 +93,9 @@ def get_user_inputs(checkpoints_dir):
     if os.path.exists(full_dir_location):
         if input("Do you want to load the previous checkpoint for this simulation? [y/n]\n> ") == "y":
             load_checkpoint = True
+    if not load_checkpoint:
+        pass
+
     return simulation_location, load_checkpoint
 
 def save_info(agent, win_loss, save_dir):
@@ -110,7 +113,7 @@ if __name__ == "__main__":
 
 
 
-    agent = PolicyGradientAgent(ALPHA=0.0005, input_dims=7, GAMMA=0.99,
+    agent = PolicyGradientAgent(ALPHA=0.0001, input_dims=7, GAMMA=0.99,
                                 n_actions=4, layer1_size=49, layer2_size=49,
                                 chkpt_dir=simulation_dir)
 
@@ -121,7 +124,7 @@ if __name__ == "__main__":
     score_history = []
     win_loss = [0, 0]
     score = 0
-    num_episodes = 10
+    num_episodes = 1000
 
     for i in range(num_episodes):
         print('episode: ', i,'score: ', score)
@@ -131,7 +134,7 @@ if __name__ == "__main__":
         observation = simulation.get_current_observation()
         while not done:
             action = agent.choose_action(observation)
-            print(action)
+            print("Action chose: {}".format(action))
             observation_, reward, done, info = simulation.add_unit(action)
             agent.store_transition(observation, action, reward)
             observation = observation_
