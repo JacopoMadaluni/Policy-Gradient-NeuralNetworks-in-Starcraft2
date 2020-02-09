@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 import time
 from sc2 import run_game, maps, Race, Difficulty, position, Result
 from sc2.player import Bot, Computer
-from SimulatorAgent import SimulatorAgent
+from .SimulatorAgent import SimulatorAgent
+from mathematical_model import model
 
 
 class SimpleSimulation():
