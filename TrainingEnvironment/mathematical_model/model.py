@@ -1,4 +1,4 @@
-from info import get_protoss_units
+from info import protoss_units
 
 class ArmyCompModel:
 
@@ -11,7 +11,7 @@ class ArmyCompModel:
         self.enemy_unit_types = []
         self.init_enemy_unit_types()
 
-        self.protoss_units = get_protoss_units()
+        self.protoss_units = protoss_units()
 
         self.units = []
         self.init_protoss_units_by_utility()
@@ -53,10 +53,13 @@ class ArmyCompModel:
         for e in self.units:
             total += e[1]
 
+        if total == 0:
+            total = 1
+            
         for e in self.units:
             e[1] = e[1]/total
 
-    def get_percentage_of(self, unit):
+    def percentage_of(self, unit):
         """
         To be implemented
         """
@@ -74,9 +77,9 @@ class ArmyCompModel:
                 return e[1]
         return None
 
-    def get_army_comp(self):
+    def army_comp(self):
         countered_units = set()
-        table = get_protoss_units()
+        table = protoss_units()
         composition = []
         for unit in self.units:
             counters = table[unit]["counters"]
@@ -84,7 +87,7 @@ class ArmyCompModel:
             for c in counters:
                 if c not in countered_units and c in self.enemy_units:
                     countered_units.add(c)
-                    percentage_of_c = self.get_percentage_of(c)
+                    percentage_of_c = self.percentage_of(c)
                     percentage += percentage_of_c
             composition.append((unit, percentage))
 

@@ -12,14 +12,11 @@ def random_army(number_of_different_units, min_supply, max_supply):
     units_to_pick = number_of_different_units
     units = []
     while units_to_pick != 0:
-        for unit in terran_units:
-            if terran_units[unit]["disabled"]:
-                continue
-            if random.uniform(0, 1) > 0.9:
-                units.append(unit)
-                units_to_pick -= 1
-            if units_to_pick == 0:
-                break
+        u = random.choice(list(terran_units))
+        if u not in units and terran_units[u]["disabled"] == False:
+           units.append(u)
+           units_to_pick -= 1 
+
 
     composition = []
     for i, unit_type in enumerate(units): 
@@ -33,7 +30,7 @@ def random_army(number_of_different_units, min_supply, max_supply):
         else:
             allocated_supply = random.randint(unit["supply"], total_supply)   
             amount = math.floor(allocated_supply / unit["supply"])
-     
+
         composition.append([unit_type, amount])
         total_supply -= allocated_supply
 
@@ -59,14 +56,24 @@ def bio_army(size):
        n_medivacs = 4
 
     medivac_supply = n_medivacs * 2
+    n_marines   = random.randint(10, math.floor(supply/2))
     supply -= medivac_supply
-    n_marines   = random.randint(10, supply/2)
     n_marauders = math.floor((supply - n_marines)/2)
 
     return [[MARINE, n_marines], [MARAUDER, n_marauders], [MEDIVAC, n_medivacs]]
 
 def mech_army(size):
-    pass                
+    assert (size % 5) == 0
+    supply = size
+    supply_each = size/5
+
+    n_hellbats = math.floor(supply_each/terran_units[HELLIONTANK]["supply"])
+    n_cyclones = math.floor(supply_each/terran_units[CYCLONE]["supply"])
+    n_tanks    = math.floor(supply_each/terran_units[SIEGETANK]["supply"])
+    n_thors    = math.floor(supply_each/terran_units[THOR]["supply"])
+    n_vikings  = math.floor(supply_each/terran_units[VIKING]["supply"])
+
+    return [[HELLIONTANK, n_hellbats], [CYCLONE, n_cyclones], [SIEGETANK, n_tanks], [THOR, n_thors], [VIKING, n_vikings]]                
 
 
 if __name__ == "__main__":

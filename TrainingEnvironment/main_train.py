@@ -8,70 +8,14 @@ import math
 import matplotlib.pyplot as plt
 import threading
 import os
+from info import *
 from sc2 import run_game, maps, Race, Difficulty, position, Result
 from sc2.player import Bot, Computer
 from neural_training.PolicyGradient import PolicyGradientAgent
-from neural_training.Simulations import SimpleSimulation
+from neural_training.Simulations import SimpleSimulation, HardSimulation
 
 
-
-
-
-
-
-class Simulation():
-
-    def __init__(self):
-        # generating army
-        self.n_marines   = round(random.uniform(0, 10))
-        self.n_marauders = round(random.uniform(0, 10))
-        self.n_tanks     = round(random.uniform(0, 5))
-        self.n_banshees  = round(random.uniform(0, 5))
-
-        self.n_zealots   = 0
-        self.n_stalkers  = 0
-        self.n_immortals = 0
-
-        self.current_observation = [0, 0, 0, self.n_marines, self.n_marauders, self.n_tanks, self.n_banshees]
-
-
-        self.total_supply = self.n_marines + self.n_marauders * 2 + self.n_tanks * 3 + self.n_banshees * 3
-        print("Enemy supply: {}".format(self.total_supply))
-        self.current_supply = 0
-        self.ready = False
-
-    def get_current_observation(self):
-        return np.array(self.current_observation)
-
-    def add_unit(self, unit):
-        if unit == 0:
-            self.n_zealots += 1
-            self.current_supply += 2
-            self.current_observation[0] += 1
-        elif unit == 1:
-            self.n_stalkers += 1
-            self.current_supply += 2
-            self.current_observation[1] += 1
-        else:
-            self.n_immortals += 1
-            self.current_supply += 4
-            self.current_observation[2] += 1
-        if self.current_supply >= self.total_supply:
-                self.ready = True
-
-        #observation_, reward, done, info
-        return self.get_current_observation(), 0, self.ready, ""
-
-
-    def simulate_exchange(self):
-        result = run_game(maps.get("TrainingEnvironment"),
-            [Bot(Race.Protoss, SimulatorAgent(self.current_observation)), Computer(Race.Terran, Difficulty.Easy)],
-            realtime=True)
-        if result == Result.Victory:
-            return 1
-        else:
-            return -1
-
+hard_simulation_initial_namespace = [ZEALOT, STALKER, ADEPT, IMMORTAL, COLOSSUS, VOIDRAY, ARCHON]
 
 def plotLearning(scores, filename, x=None, window=5):
     N = len(scores)
@@ -93,10 +37,64 @@ def get_user_inputs(checkpoints_dir):
     if os.path.exists(full_dir_location):
         if input("Do you want to load the previous checkpoint for this simulation? [y/n]\n> ") == "y":
             load_checkpoint = True
-    if not load_checkpoint:
-        pass
+    else:
+        os.mkdir(full_dir_location)
 
     return simulation_location, load_checkpoint
+
+def get_agent_settings(simulation_dir):
+    info_path = os.path.join(simulation_dir, "info") 
+
+    alpha = None
+    gamma = None
+    actions = None
+    l1 = None
+    l2 = None
+    input_dims = None
+    namespace = None
+
+    with open(info_path, "r") as info_file:
+        content = info_file.read()
+
+        alpha_i = content.find("ALPHA")
+        alpha = float(content[alpha_i+7: alpha_i+7+7])  
+
+        gamma_i = content.find("GAMMA")
+        gamma = float(content[gamma_i+7: gamma_i+7+4]) 
+
+        actions_i = content.find("n_actions")
+        actions = int(content[actions_i+11])
+
+        l1_i = content.find("L1")
+        l1 = int(content[l1_i+4: l1_i+4+2])
+
+        l2_i = content.find("L2")
+        l2 = int(content[l2_i+4: l2_i+4+2])
+
+        input_dims_i = content.find("input_dims")
+        input_dims = int(content[input_dims_i+12: input_dims_i+12+2])
+
+        namespace_i = content.find("-$$")
+        namespace_end = content.find("$$-")
+        ns_string = content[namespace_i+3 : namespace_end]
+        namespace = deserialize_namespace(ns_string)  
+
+    return alpha, gamma, actions, l1, l2, input_dims, namespace    
+
+
+def get_initial_namespace():
+    namespace = []
+    print("Press [y/n] to choose which units the agent can use to counter the enemy army.\n\n")
+    dictt = name_to_id()
+    for name in dictt:
+        if input("Use {}? [y/n]\n>".format(name)) == "y":
+            namespace.append(dictt[name])
+    print("Initialized following namespace: ")
+    print(namespace)
+    serialized = serialize_namespace(namespace)
+    return namespace, serialized        
+        
+   
 
 def save_info(agent, win_loss, save_dir):
     win_ratio = (win_loss[0]/(win_loss[0]+win_loss[1]))
@@ -112,14 +110,26 @@ if __name__ == "__main__":
     simulation_dir = os.path.join(checkpoints_dir, simulation_location)
 
 
-
-    agent = PolicyGradientAgent(ALPHA=0.0001, input_dims=7, GAMMA=0.99,
-                                n_actions=4, layer1_size=49, layer2_size=49,
-                                chkpt_dir=simulation_dir)
+    agent = None
+    namespace = None # default
 
     if load_checkpoint:
+        alpha, gamma, actions, l1, l2, input_dims, namespace = get_agent_settings(simulation_dir)
+        namespace_serialized = serialize_namespace(namespace)
+        agent = PolicyGradientAgent(ALPHA=alpha, input_dims=input_dims, GAMMA=gamma,
+                                n_actions=actions, layer1_size=l1, layer2_size=l2,
+                                chkpt_dir=simulation_dir, action_namespace=namespace_serialized)
         agent.load_checkpoint()
-        print("Checkpoint successfully loaded")
+        print("Checkpoint successfully loaded with following settings:")
+        print(agent)
+
+    else:
+        namespace, namespace_serialized = get_initial_namespace()
+        n_actions = len(namespace)
+        input_dims = n_actions + n_active_terran_units()
+        agent = PolicyGradientAgent(ALPHA=0.0001, input_dims=input_dims, GAMMA=0.99,
+                                n_actions=n_actions, layer1_size=64, layer2_size=64,
+                                chkpt_dir=simulation_dir, action_namespace=namespace_serialized)    
 
     score_history = []
     win_loss = [0, 0]
@@ -130,7 +140,9 @@ if __name__ == "__main__":
         print('episode: ', i,'score: ', score)
         done = False
         score = 0
-        simulation = SimpleSimulation()
+        #simulation = SimpleSimulation()
+        simulation = HardSimulation(namespace)
+        simulation.disable_model_rewards()
         observation = simulation.get_current_observation()
         while not done:
             action = agent.choose_action(observation)
@@ -154,5 +166,6 @@ if __name__ == "__main__":
         agent.learn()
 
         agent.save_checkpoint()
+        del simulation
 
     save_info(agent, win_loss, simulation_dir)

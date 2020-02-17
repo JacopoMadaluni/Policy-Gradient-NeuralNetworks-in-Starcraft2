@@ -1,15 +1,66 @@
 # TERRAN UNITS
-from sc2.constants import SCV, MULE, MARINE, MARAUDER, REAPER, GHOST, HELLION, WIDOWMINE, SIEGETANK, \
-                        CYCLONE, HELLIONTANK, THOR, VIKING, VIKINGFIGHTER, MEDIVAC, LIBERATOR, \
+from sc2.constants import SCV, MULE, MARINE, MARAUDER, REAPER, GHOST, HELLION, WIDOWMINE, SIEGETANK, SIEGETANKSIEGED,  \
+                        CYCLONE, HELLIONTANK, THOR, THORAP, VIKING, VIKINGFIGHTER, MEDIVAC, LIBERATOR, \
                         BANSHEE, RAVEN, BATTLECRUISER
 
 # TOSS UNITS
 from sc2.constants import PROBE, ZEALOT, SENTRY, STALKER, ADEPT, HIGHTEMPLAR, DARKTEMPLAR, ARCHON, OBSERVER, WARPPRISM, IMMORTAL, \
                         COLOSSUS, DISRUPTOR, PHOENIX, VOIDRAY, ORACLE, TEMPEST, CARRIER, MOTHERSHIP
 
-def get_protoss_units():
+def all_units():
+    to_return = {}
+    to_return.update(protoss_units())
+    to_return.update(terran_units())
+    return to_return
+
+def n_active_terran_units():
+    t_units = terran_units()
+    return sum([1 for k in t_units if t_units[k]["disabled"]==False])
+
+def serialize_namespace(namespace):
+    toss_units = protoss_units()
+    serialized = "-$$"
+    for unit_id in namespace:
+        serialized += "{},".format(toss_units[unit_id]["name"])
+    
+    serialized = serialized[:-1] # remove last comma
+    serialized += "$$-"
+    return serialized
+
+def deserialize_namespace(namespace):
+    n_to_id = name_to_id()
+    ns = []
+    names = namespace.replace("-", "").replace("$$", "").split(",")  
+    for name in names:
+        ns.append(n_to_id[name])
+    return ns    
+
+
+
+def name_to_id():
+    return {
+        "probe": PROBE,
+        "zealot": ZEALOT,
+        "sentry": SENTRY,
+        "stalker": STALKER,
+        "adept": ADEPT,
+        "ht": HIGHTEMPLAR,
+        "dt": DARKTEMPLAR,
+        "archon": ARCHON,
+        "immortal": IMMORTAL,
+        "colossus": COLOSSUS,
+        "phoenix": PHOENIX,
+        "voidray": VOIDRAY,
+        "tempest": TEMPEST,
+        "carrier": CARRIER
+    }    
+
+
+
+def protoss_units():
         return {
             PROBE: {
+                "name": "probe",
                 "supply": 1,
                 "counters": set([]),
                 "counteredby":set([]), # to be fixed in other entries
@@ -24,6 +75,7 @@ def get_protoss_units():
                     CYCLONE: -10,
                     HELLIONTANK: -10,
                     THOR: -10,
+                    THORAP: -10,
                     VIKING: -10,
                     VIKINGFIGHTER: -10,
                     MEDIVAC: -10,
@@ -34,6 +86,7 @@ def get_protoss_units():
                 }
             },
             ZEALOT : {
+                "name": "zealot",
                 "supply": 2,
                 "counters": set([MARINE, HELLION]),
                 "utility_against":{
@@ -47,6 +100,7 @@ def get_protoss_units():
                     CYCLONE: 8,
                     HELLIONTANK: -8,
                     THOR: 5,
+                    THORAP: 5,
                     VIKING: 0,
                     VIKINGFIGHTER: 6,
                     MEDIVAC: 0,
@@ -57,6 +111,7 @@ def get_protoss_units():
                 }
             },
             ADEPT: {
+                "name": "adept",
                 "supply": 2,
                 "counters": set([MARAUDER, SIEGETANK, CYCLONE]),
                 "utility_against":{
@@ -70,6 +125,7 @@ def get_protoss_units():
                     CYCLONE: -8,
                     HELLIONTANK: -7,
                     THOR: -9,
+                    THORAP: -9,
                     VIKING: 0,
                     VIKINGFIGHTER: -5,
                     MEDIVAC: 0,
@@ -80,6 +136,7 @@ def get_protoss_units():
                 }
             },
             SENTRY: {
+                "name": "sentry",
                 "supply": 2,
                 "counters": set([HELLION, BANSHEE, SIEGETANK]),
                 "utility_against":{
@@ -93,6 +150,7 @@ def get_protoss_units():
                     CYCLONE: 0,
                     HELLIONTANK: 0,
                     THOR: 0,
+                    THORAP: 0,
                     VIKING: 0,
                     VIKINGFIGHTER: 0,
                     MEDIVAC: 0,
@@ -103,7 +161,7 @@ def get_protoss_units():
                 }
             },
             STALKER: {
-
+                "name": "stalker",
                 "supply": 2,
                 "counters": set([MARAUDER, SIEGETANK]),
                 "utility_against":{
@@ -117,6 +175,7 @@ def get_protoss_units():
                     CYCLONE: -8,
                     HELLIONTANK: 8,
                     THOR: -2,
+                    THORAP: -2,
                     VIKING: 10,
                     VIKINGFIGHTER: 7,
                     MEDIVAC: 10,
@@ -127,6 +186,7 @@ def get_protoss_units():
                 }
             },
             HIGHTEMPLAR: {
+                "name": "ht",
                 "supply": 2,
                 "counters": set([SIEGETANK, GHOST]),
                 "utility_against":{
@@ -140,6 +200,7 @@ def get_protoss_units():
                     CYCLONE: 0,
                     HELLIONTANK: 0,
                     THOR: 0,
+                    THORAP: 0,
                     VIKING: 0,
                     VIKINGFIGHTER: 0,
                     MEDIVAC: 0,
@@ -150,6 +211,7 @@ def get_protoss_units():
                 }
             },
             DARKTEMPLAR: {
+                "name": "dt",
                 "supply": 2,
                 "counters": set([SIEGETANK, BANSHEE]),
                 "utility_against":{
@@ -163,6 +225,7 @@ def get_protoss_units():
                     CYCLONE: 0,
                     HELLIONTANK: 0,
                     THOR: 0,
+                    THORAP: 0,
                     VIKING: 0,
                     VIKINGFIGHTER: 0,
                     MEDIVAC: 0,
@@ -173,7 +236,8 @@ def get_protoss_units():
                 }
             },
             ARCHON: {
-                "supply": 0,
+                "name": "archon",
+                "supply": 4,
                 "counters": set([]),
                 "utility_against":{
                     MARINE: 5,
@@ -186,6 +250,7 @@ def get_protoss_units():
                     CYCLONE: 5,
                     HELLIONTANK: 5,
                     THOR: 5,
+                    THORAP: 5,
                     VIKING: 9,
                     VIKINGFIGHTER: 8,
                     MEDIVAC: 7,
@@ -196,6 +261,7 @@ def get_protoss_units():
                 }
             },
             IMMORTAL: {
+                "name": "immortal",
                 "supply": 4,
                 "counters": set([MARINE, GHOST]),
                 "utility_against":{
@@ -209,6 +275,7 @@ def get_protoss_units():
                     CYCLONE: 8,
                     HELLIONTANK: 7,
                     THOR: 8,
+                    THORAP: 8,
                     VIKING: 0,
                     VIKINGFIGHTER: 7,
                     MEDIVAC: 0,
@@ -219,6 +286,7 @@ def get_protoss_units():
                 }
             },
             COLOSSUS: {
+                "name": "colossus",
                 "supply": 6,
                 "counters": set([SIEGETANK, VIKING]),
                 "utility_against":{
@@ -232,6 +300,7 @@ def get_protoss_units():
                     CYCLONE: 5,
                     HELLIONTANK: 9,
                     THOR: 6,
+                    THORAP: 6,
                     VIKING: -10,
                     VIKINGFIGHTER: 6,
                     MEDIVAC: 0,
@@ -242,6 +311,7 @@ def get_protoss_units():
                 }
             },
             OBSERVER: {
+                "name": "observer",
                 "supply": 1,
                 "counters": set([]),
                 "utility_against":{
@@ -255,6 +325,7 @@ def get_protoss_units():
                     CYCLONE: 0,
                     HELLIONTANK: 0,
                     THOR: 0,
+                    THORAP: 0,
                     VIKING: 0,
                     VIKINGFIGHTER: 0,
                     MEDIVAC: 0,
@@ -265,7 +336,8 @@ def get_protoss_units():
                 }
             },
             PHOENIX: {
-                "supply": 1,
+                "name": "phoenix",
+                "supply": 2,
                 "counters": set([]),
                 "utility_against":{
                     MARINE: -10,
@@ -278,6 +350,7 @@ def get_protoss_units():
                     CYCLONE: -7,
                     HELLIONTANK: 0,
                     THOR: -10,
+                    THORAP: -10,
                     VIKING: 5,
                     VIKINGFIGHTER: 0,
                     MEDIVAC: 8,
@@ -288,7 +361,8 @@ def get_protoss_units():
                 }
             },
             VOIDRAY: {
-                "supply": 1,
+                "name": "voidray",
+                "supply": 4,
                 "counters": set([]),
                 "utility_against":{
                     MARINE: -2,
@@ -301,6 +375,7 @@ def get_protoss_units():
                     CYCLONE: 6,
                     HELLIONTANK: 8,
                     THOR: 5,
+                    THORAP: 5,
                     VIKING: 6,
                     VIKINGFIGHTER: 8,
                     MEDIVAC: 5,
@@ -311,7 +386,8 @@ def get_protoss_units():
                 }
             },
             TEMPEST: {
-                "supply": 1,
+                "name": "tempest",
+                "supply": 5,
                 "counters": set([]),
                 "utility_against":{
                     MARINE: 0,
@@ -324,6 +400,7 @@ def get_protoss_units():
                     CYCLONE: 0,
                     HELLIONTANK: 0,
                     THOR: 0,
+                    THORAP: 0,
                     VIKING: 0,
                     VIKINGFIGHTER: 0,
                     MEDIVAC: 0,
@@ -334,7 +411,8 @@ def get_protoss_units():
                 }
             },
             CARRIER: {
-                "supply": 1,
+                "name": "carrier",
+                "supply": 6,
                 "counters": set([]),
                 "utility_against":{
                     MARINE: 0,
@@ -347,6 +425,7 @@ def get_protoss_units():
                     CYCLONE: 0,
                     HELLIONTANK: 0,
                     THOR: 0,
+                    THORAP: 0,
                     VIKING: 0,
                     VIKINGFIGHTER: 0,
                     MEDIVAC: 0,
@@ -360,70 +439,102 @@ def get_protoss_units():
 def terran_units():
     return {
                 MARINE: {
+                    "name": "marine",
                     "counters": set([COLOSSUS]),
                     "supply": 1,
                     "disabled": False
                 },
                 MARAUDER: {
+                    "name": "marauder",
                     "counters": set([IMMORTAL, VOIDRAY, ZEALOT]),
                     "supply": 2,
                     "disabled": False
                 },
                 REAPER: {
+                    "name": "reaper",
                     "counters": set([STALKER]),
                     "supply": 1,
                     "disabled": False
                 },
                 GHOST: {
+                    "name": "ghost",
                     "counters": set([STALKER]),
                     "supply": 2,
                     "disabled": False
                 },
                 HELLION: {
+                    "name": "hellion",
                     "counters": set([STALKER]),
                     "supply": 2,
                     "disabled": False
                 },
                 HELLIONTANK: {
+                    "name": "hellbat",
                     "supply": 2,
                     "disabled": False
                 },
+                CYCLONE: {
+                    "name": "cyclone",
+                    "counters": set([STALKER]),
+                    "supply": 3,
+                    "disabled": False
+                },
                 SIEGETANK: {
+                    "name": "stank",
                     "counters": set([IMMORTAL, VOIDRAY]),
                     "supply": 3,
                     "disabled": False
                 },
+                SIEGETANKSIEGED: {
+                    "name": "stank",
+                    "counters": set([IMMORTAL, VOIDRAY]),
+                    "supply": 3,
+                    "disabled": True
+                },
                 THOR: {
+                    "name": "thor",
+                    "counters": set([IMMORTAL]),
+                    "supply": 6,
+                    "disabled": False
+                },
+                THORAP: {
+                    "name": "thor",
                     "counters": set([IMMORTAL]),
                     "supply": 6,
                     "disabled": False
                 },
                 BANSHEE: {
+                    "name": "banshee",
                     "counters": set([VOIDRAY]),
                     "supply": 3,
                     "disabled": False
                 },
                 VIKING: {
+                    "name": "viking",
                     "counters": set([STALKER]),
                     "supply": 2,
                     "disabled": False
                 },
                 VIKINGFIGHTER: {
+                    "name": "?",
                     "counters": set([STALKER]),
                     "supply": 2,
-                    "disabled": False
+                    "disabled": True
                 },
                 RAVEN: {
+                    "name": "raven",
                     "counters": set([STALKER]),
                     "supply": 2,
                     "disabled": True
                 },
                 MEDIVAC: {
+                    "name": "medivac",
                     "counters": set([STALKER, VOIDRAY]),
                     "supply": 2,
                     "disabled": False
                 },
                 BATTLECRUISER: {
+                    "name": "bc",
                     "counters": set([VOIDRAY]),
                     "supply": 6,
                     "disabled": False

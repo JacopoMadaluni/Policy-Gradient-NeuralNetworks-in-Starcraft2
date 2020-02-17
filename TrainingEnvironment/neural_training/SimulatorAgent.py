@@ -79,5 +79,11 @@ class SimulatorAgent(sc2.BotAI):
 
         else:
             # How much army does enemy have left
-            reward = (-1) * self.normalize_supply_left(self.compute_enemy_supply_belief())
-            self.submit_reward(reward)
+            enemy_supply = self.compute_enemy_supply_belief()
+            if self.supply_army > enemy_supply:
+                # Timed out, did not actually lose
+                reward = self.normalize_supply_left(self.supply_army)
+                self.submit_reward(reward)
+            else:    
+                reward = (-1) * self.normalize_supply_left(enemy_supply)
+                self.submit_reward(reward)

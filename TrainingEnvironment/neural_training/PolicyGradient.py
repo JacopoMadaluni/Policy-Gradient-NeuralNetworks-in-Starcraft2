@@ -8,7 +8,7 @@ import ctypes
 class PolicyGradientAgent():
     def __init__(self, ALPHA, GAMMA=0.95, n_actions=4,
                  layer1_size=16, layer2_size=16, input_dims=128,
-                 chkpt_dir='tmp/checkpoints'):
+                 chkpt_dir='tmp/checkpoints', action_namespace=None):
         self.lr = ALPHA
         self.gamma = GAMMA
         self.n_actions = n_actions
@@ -24,10 +24,11 @@ class PolicyGradientAgent():
         self.sess.run(tf.global_variables_initializer())
         self.saver = tf.train.Saver()
         self.checkpoint_file = os.path.join(chkpt_dir,'policy_network.ckpt')
-
+        self.action_namespace = action_namespace # serialized to string
+ 
     def __repr__(self):
-        return "ALPHA: {}\nGAMMA: {}\nn_actions: {}\nL1: {}\nL2: {}\ninput_dims: {}".format(self.lr,
-                            self.gamma, self.n_actions, self.layer1_size, self.layer2_size, self.input_dims)
+        return "ALPHA: {}\nGAMMA: {}\nn_actions: {}\nL1: {}\nL2: {}\ninput_dims: {}\nnamespace: {}".format(self.lr,
+                            self.gamma, self.n_actions, self.layer1_size, self.layer2_size, self.input_dims, self.action_namespace)
 
     def build_net(self):
         tf.disable_eager_execution()
@@ -61,7 +62,7 @@ class PolicyGradientAgent():
             self.train_op = tf.train.AdamOptimizer(self.lr).minimize(loss)
 
     def choose_action(self, observation):
-        print(observation)
+        print(">>> Observation: {}".format(observation))
         observation = observation[np.newaxis, :]
         probabilities = self.sess.run(self.actions, feed_dict={self.input: observation})[0]
         action = np.random.choice(self.action_space, p = probabilities )

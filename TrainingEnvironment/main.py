@@ -10,6 +10,15 @@ from sc2.constants import PROBE, ZEALOT, SENTRY, STALKER, ADEPT, HIGHTEMPLAR, DA
 
 
 if __name__ == "__main__":
-    sim = SimpleSimulation()
+    sim = HardSimulation()
     model = sim.model
-    print(model.utility_of(PHOENIX))
+    print("------> model choice: {}".format(model.units[0]))
+    while sim.ready == False:
+        sim.add_unit(4)
+    print(sim.get_current_observation())    
+    print("Number of features: {}".format(len(sim.get_current_observation())))
+    print("Number of actions: {}".format(sim.n_of_ally_different_units))
+    #sim.simulate_exchange()
+
+        
+    
