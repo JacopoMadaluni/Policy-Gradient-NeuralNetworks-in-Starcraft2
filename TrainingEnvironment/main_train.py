@@ -43,7 +43,7 @@ def get_user_inputs(checkpoints_dir):
     return simulation_location, load_checkpoint
 
 def get_agent_settings(simulation_dir):
-    info_path = os.path.join(simulation_dir, "info") 
+    info_path = os.path.join(simulation_dir, "info")
 
     alpha = None
     gamma = None
@@ -57,10 +57,10 @@ def get_agent_settings(simulation_dir):
         content = info_file.read()
 
         alpha_i = content.find("ALPHA")
-        alpha = float(content[alpha_i+7: alpha_i+7+7])  
+        alpha = float(content[alpha_i+7: alpha_i+7+7])
 
         gamma_i = content.find("GAMMA")
-        gamma = float(content[gamma_i+7: gamma_i+7+4]) 
+        gamma = float(content[gamma_i+7: gamma_i+7+4])
 
         actions_i = content.find("n_actions")
         actions = int(content[actions_i+11])
@@ -77,9 +77,9 @@ def get_agent_settings(simulation_dir):
         namespace_i = content.find("-$$")
         namespace_end = content.find("$$-")
         ns_string = content[namespace_i+3 : namespace_end]
-        namespace = deserialize_namespace(ns_string)  
+        namespace = deserialize_namespace(ns_string)
 
-    return alpha, gamma, actions, l1, l2, input_dims, namespace    
+    return alpha, gamma, actions, l1, l2, input_dims, namespace
 
 
 def get_initial_namespace():
@@ -92,9 +92,9 @@ def get_initial_namespace():
     print("Initialized following namespace: ")
     print(namespace)
     serialized = serialize_namespace(namespace)
-    return namespace, serialized        
-        
-   
+    return namespace, serialized
+
+
 
 def save_info(agent, win_loss, save_dir):
     win_ratio = (win_loss[0]/(win_loss[0]+win_loss[1]))
@@ -129,7 +129,7 @@ if __name__ == "__main__":
         input_dims = n_actions + n_active_terran_units()
         agent = PolicyGradientAgent(ALPHA=0.0001, input_dims=input_dims, GAMMA=0.99,
                                 n_actions=n_actions, layer1_size=64, layer2_size=64,
-                                chkpt_dir=simulation_dir, action_namespace=namespace_serialized)    
+                                chkpt_dir=simulation_dir, action_namespace=namespace_serialized)
 
     score_history = []
     win_loss = [0, 0]
@@ -142,7 +142,6 @@ if __name__ == "__main__":
         score = 0
         #simulation = SimpleSimulation()
         simulation = HardSimulation(namespace)
-        simulation.disable_model_rewards()
         observation = simulation.get_current_observation()
         while not done:
             action = agent.choose_action(observation)

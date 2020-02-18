@@ -23,14 +23,14 @@ class Simulation:
         pass
 
     def on_end(self, result):
-        self.result = result    
+        self.result = result
 
     def simulate_exchange(self):
         result = run_game(maps.get("TrainingEnvironment"),
             [Bot(Race.Protoss, SimulatorAgent(self.current_observation, self.total_supply, self.commands, self.on_end)), Computer(Race.Terran, Difficulty.Easy)],
             realtime=True)
 
-        return self.result     
+        return self.result
 
 
 class SimpleSimulation():
@@ -43,7 +43,7 @@ class SimpleSimulation():
         self.commands = []
 
         self.normalize = True
-        self.use_model_rewards = True 
+        self.use_model_rewards = True
 
         rand = random.uniform(0,4)
         if rand <= 1:
@@ -168,6 +168,8 @@ class HardSimulation(Simulation):
     def __init__(self, initial_namespace):
         super(HardSimulation, self).__init__()
 
+        self.use_model_rewards = True
+
          # generating army
         self.commands  = []
         self.normalize = True
@@ -184,16 +186,16 @@ class HardSimulation(Simulation):
             self.army = army_generator.big_random_army()
             print(">>>> Big random army")
         elif rand <=4:
-           self.army = army_generator.mech_army(random.choice([40, 45, 50, 55, 60, 65, 70])) 
+           self.army = army_generator.mech_army(random.choice([40, 45, 50, 55, 60, 65, 70]))
            print(">>>> Mech army")
         else:
             self.army = army_generator.bio_army(random.randint(22,70))
             print(">>>> Bio army")
 
-        
+
         self.n_of_ally_different_units = len(initial_namespace)
         self.unit_namespace = list(initial_namespace)
-        
+
 
         # Order matters
         self.e_unit_namespace = [k for k in terran_units if terran_units[k]["disabled"] == False]
@@ -219,10 +221,10 @@ class HardSimulation(Simulation):
                     index = i + self.n_of_ally_different_units
                     assert self.current_observation[index] == 0
                     self.current_observation[index] = e[1]
-   
+
 
     def disable_normalization(self):
-        self.normalize = False   
+        self.normalize = False
 
     def disable_model_rewards(self):
         self.use_model_rewards = False
@@ -232,12 +234,12 @@ class HardSimulation(Simulation):
     def initialize_in_game_simulation_commands(self):
         for u_type, amount in zip(self.unit_namespace, self.current_observation):
             self.commands.append("-{} {}".format(all_units[u_type]["name"], amount))
-        
-        print("Initialized commands: {}".format(self.commands))    
+
+        print("Initialized commands: {}".format(self.commands))
 
     def normalize_observation(self):
         o = self.current_observation
-        total_ally_supply = sum([protoss_units[self.unit_namespace[i]]["supply"]*self.current_observation[i] for i in range(self.n_of_ally_different_units)]) 
+        total_ally_supply = sum([protoss_units[self.unit_namespace[i]]["supply"]*self.current_observation[i] for i in range(self.n_of_ally_different_units)])
         if total_ally_supply == 0:
             total_ally_supply = 1
         normalized_obs = []
@@ -248,7 +250,7 @@ class HardSimulation(Simulation):
             unit_type = self.unit_namespace[i]
             normalized_obs.append(o[i]*terran_units[unit_type]["supply"]/self.total_supply)
         print("Normalized observation: {}".format(normalized_obs))
-        return normalized_obs      
+        return normalized_obs
 
 
     def get_current_observation(self):
@@ -256,7 +258,7 @@ class HardSimulation(Simulation):
             normalized = self.normalize_observation()
             return np.array(normalized)
         else:
-            return np.array(self.current_observation)  
+            return np.array(self.current_observation)
 
     def get_raw_observation(self):
         return self.current_observation
@@ -265,7 +267,7 @@ class HardSimulation(Simulation):
         unit_type = self.unit_namespace[unit]
         self.current_observation[unit] += 1
         self.current_supply += protoss_units[unit_type]["supply"]
-        
+
         reward = 0
         if self.use_model_rewards:
             reward = self.model.utility_of(unit_type)
@@ -274,14 +276,5 @@ class HardSimulation(Simulation):
             self.initialize_in_game_simulation_commands()
             self.ready = True
 
-        #observation_, reward, done, info  
-        return self.get_current_observation(), reward, self.ready, "" 
-
-     
-
-
-
-
-
-
-       
+        #observation_, reward, done, info
+        return self.get_current_observation(), reward, self.ready, ""
