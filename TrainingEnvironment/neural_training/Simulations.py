@@ -270,7 +270,7 @@ class HardSimulation(Simulation):
 
         reward = 0
         if self.use_model_rewards:
-            reward = self.model.utility_of(unit_type)
+            reward = self.model.utility_of(unit_type) * 0.01
 
         if self.current_supply >= self.total_supply:
             self.initialize_in_game_simulation_commands()
