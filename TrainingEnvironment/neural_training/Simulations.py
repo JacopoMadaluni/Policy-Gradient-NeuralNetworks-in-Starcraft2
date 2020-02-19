@@ -28,7 +28,7 @@ class Simulation:
     def simulate_exchange(self):
         result = run_game(maps.get("TrainingEnvironment"),
             [Bot(Race.Protoss, SimulatorAgent(self.current_observation, self.total_supply, self.commands, self.on_end)), Computer(Race.Terran, Difficulty.Easy)],
-            realtime=True)
+            realtime=False)
 
         return self.result
 

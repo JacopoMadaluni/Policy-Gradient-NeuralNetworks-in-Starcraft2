@@ -5,4 +5,4 @@ L1: 64
 L2: 64
 input_dims: 20
 namespace: -$$zealot,sentry,stalker,adept,archon,immortal$$-
-Win ratio: 1.0
+Win ratio: 0.47

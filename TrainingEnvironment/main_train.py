@@ -86,11 +86,15 @@ def get_initial_namespace():
     namespace = []
     print("Press [y/n] to choose which units the agent can use to counter the enemy army.\n\n")
     dictt = name_to_id()
-    for name in dictt:
-        if input("Use {}? [y/n]\n>".format(name)) == "y":
-            namespace.append(dictt[name])
-    print("Initialized following namespace: ")
-    print(namespace)
+    ok = "n"
+    while ok != "y":
+        namespace = []
+        for name in dictt:
+            if input("Use {}? [y/n]\n>".format(name)) == "y":
+                namespace.append(dictt[name])
+        print("Initialized following namespace: {}".format(namespace))
+        ok = input("Proceed? [y/n]")
+
     serialized = serialize_namespace(namespace)
     return namespace, serialized
 
