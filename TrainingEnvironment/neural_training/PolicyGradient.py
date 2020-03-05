@@ -23,9 +23,11 @@ class PolicyGradientAgent():
         self.build_net()
         self.sess.run(tf.global_variables_initializer())
         self.saver = tf.train.Saver()
+        self.checkpoints_dir = chkpt_dir
         self.checkpoint_file = os.path.join(chkpt_dir,'policy_network.ckpt')
         self.action_namespace = action_namespace # serialized to string
- 
+        file_writer = tf.summary.FileWriter(self.checkpoints_dir, self.sess.graph)
+
     def __repr__(self):
         return "ALPHA: {}\nGAMMA: {}\nn_actions: {}\nL1: {}\nL2: {}\ninput_dims: {}\nnamespace: {}".format(self.lr,
                             self.gamma, self.n_actions, self.layer1_size, self.layer2_size, self.input_dims, self.action_namespace)
@@ -92,9 +94,10 @@ class PolicyGradientAgent():
                 G_sum += reward_memory[k] * discount
                 discount *= self.gamma
             G[t] = G_sum
-        mean = np.mean(G)
-        std = np.std(G) if np.std(G) > 0 else 1
-        G = (G - mean) / std
+
+        #mean = np.mean(G)
+        #std = np.std(G) if np.std(G) > 0 else 1
+        #G = (G - mean) / std
 
         print("G: {}".format(G))
 

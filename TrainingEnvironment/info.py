@@ -22,7 +22,7 @@ def serialize_namespace(namespace):
     serialized = "-$$"
     for unit_id in namespace:
         serialized += "{},".format(toss_units[unit_id]["name"])
-    
+
     serialized = serialized[:-1] # remove last comma
     serialized += "$$-"
     return serialized
@@ -30,10 +30,10 @@ def serialize_namespace(namespace):
 def deserialize_namespace(namespace):
     n_to_id = name_to_id()
     ns = []
-    names = namespace.replace("-", "").replace("$$", "").split(",")  
+    names = namespace.replace("-", "").replace("$$", "").split(",")
     for name in names:
         ns.append(n_to_id[name])
-    return ns    
+    return ns
 
 
 
@@ -53,7 +53,7 @@ def name_to_id():
         "voidray": VOIDRAY,
         "tempest": TEMPEST,
         "carrier": CARRIER
-    }    
+    }
 
 
 

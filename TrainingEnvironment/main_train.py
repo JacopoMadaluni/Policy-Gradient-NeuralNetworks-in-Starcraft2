@@ -57,22 +57,33 @@ def get_agent_settings(simulation_dir):
         content = info_file.read()
 
         alpha_i = content.find("ALPHA")
-        alpha = float(content[alpha_i+7: alpha_i+7+7])
+        end = content.find("\n", alpha_i)
+
+        print("{}, {}".format(alpha_i, end))
+
+        alpha = float(content[alpha_i+7: end])
 
         gamma_i = content.find("GAMMA")
-        gamma = float(content[gamma_i+7: gamma_i+7+4])
+        end = content.find("\n", gamma_i)
+
+        print("{}, {}".format(gamma_i, end))
+        gamma = float(content[gamma_i+7: end])
 
         actions_i = content.find("n_actions")
-        actions = int(content[actions_i+11])
+        end = content.find("\n", actions_i)
+        actions = int(content[end-1])
 
         l1_i = content.find("L1")
-        l1 = int(content[l1_i+4: l1_i+4+2])
+        end = content.find("\n", l1_i)
+        l1 = int(content[l1_i+4: end])
 
         l2_i = content.find("L2")
-        l2 = int(content[l2_i+4: l2_i+4+2])
+        end = content.find("\n", l2_i)
+        l2 = int(content[l2_i+4: end])
 
         input_dims_i = content.find("input_dims")
-        input_dims = int(content[input_dims_i+12: input_dims_i+12+2])
+        end = content.find("\n", input_dims_i)
+        input_dims = int(content[input_dims_i+12: end])
 
         namespace_i = content.find("-$$")
         namespace_end = content.find("$$-")
@@ -131,8 +142,8 @@ if __name__ == "__main__":
         namespace, namespace_serialized = get_initial_namespace()
         n_actions = len(namespace)
         input_dims = n_actions + n_active_terran_units()
-        agent = PolicyGradientAgent(ALPHA=0.0001, input_dims=input_dims, GAMMA=0.99,
-                                n_actions=n_actions, layer1_size=64, layer2_size=64,
+        agent = PolicyGradientAgent(ALPHA=0.01, input_dims=input_dims, GAMMA=0.99,
+                                n_actions=n_actions, layer1_size=128, layer2_size=128,
                                 chkpt_dir=simulation_dir, action_namespace=namespace_serialized)
 
     score_history = []
@@ -170,5 +181,8 @@ if __name__ == "__main__":
 
         agent.save_checkpoint()
         del simulation
+
+        if i%100 == 0:
+            save_info(agent, win_loss, simulation_dir)
 
     save_info(agent, win_loss, simulation_dir)

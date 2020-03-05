@@ -56,7 +56,8 @@ class SimulatorAgent(sc2.BotAI):
 
 
     async def on_step(self, iteration):
-        self.compute_enemy_supply_belief()
+        #self.compute_enemy_supply_belief()
+        pass
 
     def normalize_supply_left(self, leftover):
         return leftover/self.initial_supply
@@ -74,16 +75,11 @@ class SimulatorAgent(sc2.BotAI):
         print("Result: {}".format(result))
         if result == Result.Victory:
             # How much army do I have left
-            reward = self.normalize_supply_left(self.supply_army)
+            reward = 500 #* self.normalize_supply_left(self.supply_army)
             self.submit_reward(reward)
 
         else:
             # How much army does enemy have left
             enemy_supply = self.compute_enemy_supply_belief()
-            if self.supply_army > enemy_supply:
-                # Timed out, did not actually lose
-                reward = self.normalize_supply_left(self.supply_army)
-                self.submit_reward(reward)
-            else:    
-                reward = (-1) * self.normalize_supply_left(enemy_supply)
-                self.submit_reward(reward)
+            reward = (-500) #* self.normalize_supply_left(enemy_supply)
+            self.submit_reward(reward)

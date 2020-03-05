@@ -23,13 +23,14 @@ class Simulation:
         pass
 
     def on_end(self, result):
+        print("ON END CALLED WITH: {}".format(result))
         self.result = result
 
     def simulate_exchange(self):
         result = run_game(maps.get("TrainingEnvironment"),
             [Bot(Race.Protoss, SimulatorAgent(self.current_observation, self.total_supply, self.commands, self.on_end)), Computer(Race.Terran, Difficulty.Easy)],
             realtime=False)
-
+        print("Result in sim {}".format(self.result))
         return self.result
 
 
@@ -270,7 +271,7 @@ class HardSimulation(Simulation):
 
         reward = 0
         if self.use_model_rewards:
-            reward = self.model.utility_of(unit_type) * 0.01
+            reward = self.model.utility_of(unit_type) * 10
 
         if self.current_supply >= self.total_supply:
             self.initialize_in_game_simulation_commands()

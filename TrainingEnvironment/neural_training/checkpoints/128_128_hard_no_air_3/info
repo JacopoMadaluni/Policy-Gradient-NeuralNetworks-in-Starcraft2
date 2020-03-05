@@ -1,0 +1,8 @@
+ALPHA: 0.01
+GAMMA: 0.99
+n_actions: 5
+L1: 128
+L2: 128
+input_dims: 19
+namespace: -$$zealot,sentry,stalker,adept,immortal$$-
+Win ratio: 0.3283582089552239
