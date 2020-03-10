@@ -170,6 +170,7 @@ class HardSimulation(Simulation):
         super(HardSimulation, self).__init__()
 
         self.use_model_rewards = True
+        self.use_supply_in_obs = True
 
          # generating army
         self.commands  = []
@@ -230,6 +231,9 @@ class HardSimulation(Simulation):
     def disable_model_rewards(self):
         self.use_model_rewards = False
 
+    def disable_total_supply_obs(self):
+        self.use_supply_in_obs = False
+
 
 
     def initialize_in_game_simulation_commands(self):
@@ -250,6 +254,9 @@ class HardSimulation(Simulation):
         for i in range(self.n_of_ally_different_units, len(self.current_observation)):
             unit_type = self.unit_namespace[i]
             normalized_obs.append(o[i]*terran_units[unit_type]["supply"]/self.total_supply)
+
+        if self.use_supply_in_obs:
+            normalized_obs = [self.total_supply - self.current_supply] + normalized_obs
         print("Normalized observation: {}".format(normalized_obs))
         return normalized_obs
 
@@ -259,7 +266,7 @@ class HardSimulation(Simulation):
             normalized = self.normalize_observation()
             return np.array(normalized)
         else:
-            return np.array(self.current_observation)
+            return np.array([self.total_supply - self.current_supply] + self.current_observation)
 
     def get_raw_observation(self):
         return self.current_observation

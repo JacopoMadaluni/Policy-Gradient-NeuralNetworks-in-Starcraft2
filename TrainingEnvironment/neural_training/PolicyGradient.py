@@ -2,43 +2,20 @@ import os
 import tensorflow.compat.v1 as tf
 import numpy as np
 import ctypes
+from .NeuralNetworks import MultiLayerNN
 
 #hllDll = ctypes.WinDLL("C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v10.0\\bin\\cudart64_100.dll")
 
-class PolicyGradientAgent():
-    def __init__(self, ALPHA, GAMMA=0.95, n_actions=4,
-                 layer1_size=16, layer2_size=16, input_dims=128,
-                 chkpt_dir='tmp/checkpoints', action_namespace=None):
-        self.lr = ALPHA
-        self.gamma = GAMMA
-        self.n_actions = n_actions
-        self.action_space = [i for i in range(n_actions)]
-        self.layer1_size = layer1_size
-        self.layer2_size = layer2_size
-        self.input_dims = input_dims
-        self.state_memory = []
-        self.action_memory = []
-        self.reward_memory = []
-        self.sess = tf.Session()
-        self.build_net()
-        self.sess.run(tf.global_variables_initializer())
-        self.saver = tf.train.Saver()
-        self.checkpoints_dir = chkpt_dir
-        self.checkpoint_file = os.path.join(chkpt_dir,'policy_network.ckpt')
-        self.action_namespace = action_namespace # serialized to string
-        file_writer = tf.summary.FileWriter(self.checkpoints_dir, self.sess.graph)
+class PolicyGradientAgent(MultiLayerNN):
+    def __init__(self, *args, **kwargs):
 
-    def __repr__(self):
-        return "ALPHA: {}\nGAMMA: {}\nn_actions: {}\nL1: {}\nL2: {}\ninput_dims: {}\nnamespace: {}".format(self.lr,
-                            self.gamma, self.n_actions, self.layer1_size, self.layer2_size, self.input_dims, self.action_namespace)
+        super(PolicyGradientAgent, self).__init__(*args, **kwargs)
 
     def build_net(self):
         tf.disable_eager_execution()
         with tf.variable_scope('parameters'):
-            self.input = tf.placeholder(tf.float32,
-                                        shape=[None, self.input_dims], name='input')
-            self.label = tf.placeholder(tf.int32,
-                                        shape=[None, ], name='label')
+            self.input = tf.placeholder(tf.float32, shape=[None, self.input_dims], name='input')
+            self.label = tf.placeholder(tf.int32, shape=[None, ], name='label')
             self.G = tf.placeholder(tf.float32, shape=[None,], name='G')
 
         with tf.variable_scope('layer1'):
@@ -67,6 +44,7 @@ class PolicyGradientAgent():
         print(">>> Observation: {}".format(observation))
         observation = observation[np.newaxis, :]
         probabilities = self.sess.run(self.actions, feed_dict={self.input: observation})[0]
+        print(probabilities)
         action = np.random.choice(self.action_space, p = probabilities )
 
         return action
@@ -108,11 +86,3 @@ class PolicyGradientAgent():
         self.state_memory = []
         self.action_memory = []
         self.reward_memory = []
-
-    def load_checkpoint(self):
-        print("...Loading checkpoint...")
-        self.saver.restore(self.sess, self.checkpoint_file)
-
-    def save_checkpoint(self):
-        #print("...Saving checkpoint...")
-        self.saver.save(self.sess, self.checkpoint_file)
