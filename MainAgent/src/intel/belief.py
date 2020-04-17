@@ -6,7 +6,10 @@ from TrainingEnvironment.info import terran_units
 import random
 
 class Belief:
-
+    
+    """
+    The belief class keeps track of the observed enemy army composition.
+    """
     def __init__(self):
         self.enemy_total_supply = 0
         self.enemy_army_comp = None
@@ -16,6 +19,9 @@ class Belief:
         print("Initialized belief: {}".format(self.enemy_army_comp))
 
     def initialize_enemy_army_namespace(self):
+        """
+        Initializes the units of which it must keep track of.
+        """
         army_namespace = {}
         all_units_info = terran_units()
         for k in all_units_info:
@@ -28,6 +34,11 @@ class Belief:
 
     @agent_method
     def update(self, agent=None):
+        """
+        Updates the belief.
+        The belief counts how many time each unit has been spotted.
+        Once normalized, this gives an accurate representation of the enemy composition.
+        """
         structures = agent.known_enemy_structures
         
         units = list(filter(lambda unit: unit.type_id not in self.exclude, agent.known_enemy_units - structures))
@@ -39,8 +50,10 @@ class Belief:
                     self.enemy_army_comp[typ] += 1
 
 
-
     def get_normalized_belief(self):
+        """
+        Normalizes the belief dictionary
+        """
         normalized_bel = self.enemy_army_comp.copy()
         total = sum(normalized_bel[k] for k in normalized_bel)
         if total == 0:
@@ -51,6 +64,9 @@ class Belief:
         return normalized_bel
 
     def get_normalized_belief_as_array(self):
+        """
+        Normalizes the belief dictionary and tranforms it into an array.
+        """
         normalized_bel = self.get_normalized_belief()
         return [normalized_bel[k] for k in normalized_bel]      
 

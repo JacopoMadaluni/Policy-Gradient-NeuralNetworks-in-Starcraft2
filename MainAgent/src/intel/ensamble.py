@@ -9,6 +9,13 @@ import numpy as np
 class GradientEnsamble:
 
     def __init__(self, gradient_names):
+        """
+        Ensamble class.
+        The gradients in input will be loaded.
+
+        P.S
+        It is currently only possible to load one gradient at the time.
+        """
 
         self.gradients = []
         for name in gradient_names:
@@ -20,6 +27,9 @@ class GradientEnsamble:
 
     @agent_method
     def get_preferred_unit(self, enemy_observation, agent=None):
+        """
+        Given an observation, it outputs the best unit from the neural network.
+        """
         for gradient in self.gradients:
             action_space = deserialize_namespace(gradient.action_namespace)
             amounts = []
@@ -33,10 +43,13 @@ class GradientEnsamble:
                 
             observation = [a/total for a in amounts]
             observation += enemy_observation
-            observation = np.array(observation)
+            observation = np.array(observation) # Convert to tensor
 
             action = gradient.choose_action(observation)
             choosen_unit = action_space[action]
+            
+            # This return statement should be outside
+            # Currently only one gradient is loaded so it's fine.
             return choosen_unit
 
 

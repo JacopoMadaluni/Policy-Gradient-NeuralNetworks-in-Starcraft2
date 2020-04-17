@@ -9,8 +9,10 @@ from ..utils.function_utils import agent_method
 
 
 class Scouter:
-
-
+    """
+    The scouter class contains the methods necessary to send units around the map and the enemy
+    base to gather information.
+    """
     def __init__(self):
         self.variances      = PositionVariances()    
         self.map_scout      = None
@@ -18,6 +20,9 @@ class Scouter:
 
     @agent_method
     def choose_map_scout(self, agent=None):
+        """
+        Chooses the best unit to scout the map.
+        """
         if self.map_scout is None:
             if agent.units(STALKER).exists:
                 stalker = random.choice(agent.units(STALKER))
@@ -34,17 +39,26 @@ class Scouter:
 
     @agent_method
     def update_next_iteration(self, agent=None):
+        """
+        Updates the next scout iteration.
+        """
         delay = random.randrange(20, 165)
         self.next_scout_iteration = agent.iteration + delay
 
     @agent_method
     async def scout_enemy_base(self, unit, agent=None):
+        """
+        Sends the input unit on a random location variance around the enemy base.
+        """
         enemy_location = agent.enemy_start_locations[0]
         position = self.variances.random_enemy_start_location_variance(agent.game_info.map_size, enemy_location)
         await agent.do(unit.move(position))
 
     @agent_method
     async def scout_map(self, agent=None):
+        """
+        Sends the best scouting unit around the map to gather information.
+        """
         if agent.iteration > self.next_scout_iteration:
             self.choose_map_scout()
             if self.map_scout is not None:
@@ -55,7 +69,9 @@ class Scouter:
 
 
 class PositionVariances:
-
+    """
+    Generate random position variances around map points.
+    """
     def position_of(self, x, y):
         return position.Point2(position.Pointlike((x, y)))
 

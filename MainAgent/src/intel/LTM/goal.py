@@ -3,48 +3,57 @@ from ...utils.function_utils import agent_method
 
 class Goal:
 
-    
+    """ 
+    Goal class represents something that must be achieved (usually a unit).
+    """
     def __init__(self, goal):
         """
         Assumes goal to be a unit
         """
-        self.units = getUnits()
+        self.units_info = getUnits()
         self.plan  = []
         self.ready_to_proceed = True
-
-        print("Initialize plan for: {}".format(goal))
         self.initialize_goal(goal)
 
     def __len__(self):
         return len(self.plan)
 
     def initialize_goal(self, goal):
+        """
+        Initializes the sequence of required actions to unlock the input goal.
+        These actions are recursively gathered by looking at what the goal requires.
+        """
         print("Initializing goal for: {}".format(goal))
         current_sub_goal = goal
         while True:
-            required = self.units.protossUnits[current_sub_goal]["required"]
-            print(required)
-            can_build = self.units.protossUnits[required]["canBuildFunction"]()
+            required = self.units_info.protossUnits[current_sub_goal]["required"]
+            can_build = self.units_info.protossUnits[required]["canBuildFunction"]()
             self.plan.append(required)
             current_sub_goal = required
             if can_build:
                 break
 
     def unlock(self):
+        """
+        Unlocks the goal to be able to execute the next action.
+        """
         self.ready_to_proceed = True
 
     @agent_method
     async def execute_next_step(self, agent=None):
+        """
+        Executes the next action in the stack.
+        """
         if not self.ready_to_proceed:
             return
         next_goal = self.plan[-1]
 
-        if agent.units(next_goal).ready.exists:
+        if agent.units_info(next_goal).ready.exists:
             self.plan.pop()
             return
 
-        print("Next goal: {}".format(next_goal))
-        build  = self.units.protossUnits[next_goal]["buildFunction"]
+        print("Next sub goal: {}".format(next_goal))
+        build  = self.units_info.protossUnits[next_goal]["buildFunction"]
         success = await build(next_goal, self.unlock)
         
  
@@ -53,10 +62,7 @@ class Goal:
             self.plan.pop()    
 
         else:
-            print("-------------- EXECUTE GOAL STEP FAILED ---------------")
-
-
-
+            print("Execution of goal action failed.")
 
     def is_fulfilled(self):
         return self.__len__() == 0
