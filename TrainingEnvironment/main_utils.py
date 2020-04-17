@@ -5,18 +5,25 @@ import math
 import matplotlib.pyplot as plt
 import threading
 import os
-from info import *
+import __main__
+
+if __main__.__file__ == "main_train.py":
+    from neural_training.PolicyGradient import PolicyGradientAgent
+    from info import *
+else:    
+    from .neural_training.PolicyGradient import PolicyGradientAgent
+    from .info import *
 
 def plotLearning(scores, filename, x=None, window=5):
     N = len(scores)
-    running_avg = np.empty(N)
+    average = np.empty(N)
     for t in range(N):
-	    running_avg[t] = np.mean(scores[max(0, t-window):(t+1)])
+	    average[t] = np.mean(scores[max(0, t-window):(t+1)])
     if x is None:
         x = [i for i in range(N)]
     plt.ylabel('Score')
     plt.xlabel('Game')
-    plt.plot(x, running_avg)
+    plt.plot(x, average)
     plt.savefig(filename)
 
 
@@ -61,7 +68,7 @@ def get_agent_settings(simulation_dir):
 
         actions_i = content.find("n_actions")
         end = content.find("\n", actions_i)
-        actions = int(content[actions_i + 11: end]) # TODO to fix
+        actions = int(content[actions_i + 11: end])
 
         l1_i = content.find("L1")
         end = content.find("\n", l1_i)
@@ -108,3 +115,20 @@ def save_info(score_history, agent, win_loss, save_dir):
 
     graphname = os.path.join(save_dir, 'graph.png')
     plotLearning(score_history, filename=graphname, window=25)
+
+
+
+def load_policy_gradient(name, path_offset=""):
+    checkpoints_dir = os.path.join(path_offset, "neural_training/checkpoints/")
+    simulation_location = name
+    simulation_dir = os.path.join(checkpoints_dir, simulation_location)    
+
+    net_name = name.replace("_", "")
+    alpha, gamma, actions, l1, l2, input_dims, namespace = get_agent_settings(simulation_dir)
+    namespace_serialized = serialize_namespace(namespace)
+    agent = PolicyGradientAgent(ALPHA=alpha, input_dims=input_dims, GAMMA=gamma,
+                            n_actions=actions, layer1_size=l1, layer2_size=l2,
+                            chkpt_dir=simulation_dir, action_namespace=namespace_serialized, 
+                            network_name=net_name)                     
+    agent.load_checkpoint()
+    return agent

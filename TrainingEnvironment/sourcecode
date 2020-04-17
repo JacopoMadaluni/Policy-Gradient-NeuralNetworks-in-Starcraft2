@@ -1,0 +1,3315 @@
+#=====
+#.
+#=====
+#./evaluate.py
+
+
+#=====
+#./evaluator
+#=====
+#./evaluator/army_generator.py
+import sys
+sys.path.append('C:\\Users\Jaco\Documents\\__FinalProject\\MainAgent\\TrainingEnvironment')
+from info import *
+import random
+import math
+
+terran_units = terran_units()
+
+def random_army(number_of_different_units, min_supply, max_supply):
+    total_supply = random.randint(min_supply, max_supply)
+    print(total_supply)
+    units_to_pick = number_of_different_units
+    units = []
+    while units_to_pick != 0:
+        u = random.choice(list(terran_units))
+        if u not in units and terran_units[u]["disabled"] == False:
+           units.append(u)
+           units_to_pick -= 1 
+
+
+    composition = []
+    for i, unit_type in enumerate(units): 
+        unit = terran_units[unit_type]
+        if unit["supply"] > total_supply:
+            break
+        amount = 0
+        if i == len(units)-1:
+            # last unit, allocate all remaining supply
+            amount = math.floor(total_supply / unit["supply"])
+        else:
+            allocated_supply = random.randint(unit["supply"], total_supply)   
+            amount = math.floor(allocated_supply / unit["supply"])
+
+        composition.append([unit_type, amount])
+        total_supply -= allocated_supply
+
+    return composition        
+
+def small_random_army():
+    return random_army(3, 10, 20)
+
+def medium_random_army():
+    return random_army(4, 20, 40)
+
+def big_random_army():
+    return random_army(6, 60, 70)
+
+def bio_army(size):
+    supply = size
+    n_medivacs = 0
+    if size > 20:
+        n_medivacs = 2
+    if size > 40:    
+        n_medivacs = 3
+    if size > 60:
+       n_medivacs = 4
+
+    medivac_supply = n_medivacs * 2
+    n_marines   = random.randint(10, math.floor(supply/2))
+    supply -= medivac_supply
+    n_marauders = math.floor((supply - n_marines)/2)
+
+    return [[MARINE, n_marines], [MARAUDER, n_marauders], [MEDIVAC, n_medivacs]]
+
+def mech_army(size):
+    assert (size % 5) == 0
+    supply = size
+    supply_each = size/5
+
+    n_hellbats = math.floor(supply_each/terran_units[HELLIONTANK]["supply"])
+    n_cyclones = math.floor(supply_each/terran_units[CYCLONE]["supply"])
+    n_tanks    = math.floor(supply_each/terran_units[SIEGETANK]["supply"])
+    n_thors    = math.floor(supply_each/terran_units[THOR]["supply"])
+    n_vikings  = math.floor(supply_each/terran_units[VIKING]["supply"])
+
+    return [[HELLIONTANK, n_hellbats], [CYCLONE, n_cyclones], [SIEGETANK, n_tanks], [THOR, n_thors], [VIKING, n_vikings]]                
+
+
+if __name__ == "__main__":
+    print(bio_army(40))
+#=====
+#./evaluator/evaluator.py
+import random
+import math
+import army_generator
+
+class Evaluator:
+    """
+    Evaluator creates armies following the array:
+
+    [[type, amount], ...] = 
+
+    [MARINE, MARAUDER, REAPER, HELLION, SIEGETANK, CYCLONE, HELLIONTANK ,
+     , ... ]
+
+    """
+
+    def __init__(self, random_army=True, bio_army=True, mech_army=True):
+        self.generator_functions = []
+        if random_army:
+            self.generator_functions.append(small_random_army)
+            self.generator_functions.append(medium_random_army)
+            self.generator_functions.append(big_random_army)
+        if bio_army:
+            self.generator_functions.append(bio_army)   
+        if mech_army:
+            self.generator_functions.append(mech_army)       
+
+        self.max_index = len(self.generator_functions) - 1
+
+        self.army        = None
+        self.composition = None
+        self.evaluation  = None
+
+         
+    def generate_enemy_army(self):
+        index = random.randint(0, self.max_index+1)
+        self.army = self.generator_functions[index]()
+        return self.army
+
+
+    def submit_composition(self, composition):
+        """
+        composition = [[type, amount], ...]
+        """
+        self.composition = composition
+
+    def evaluate(self):
+        pass           #=====
+#./evaluator/__init__.py
+#=====
+#./evaluator/__pycache__
+#=====
+#./evaluator/__pycache__/army_generator.cpython-37.pyc
+#=====
+#./evaluator/__pycache__/__init__.cpython-37.pyc
+#=====
+#./info.py
+# TERRAN UNITS
+from sc2.constants import SCV, MULE, MARINE, MARAUDER, REAPER, GHOST, HELLION, WIDOWMINE, SIEGETANK, SIEGETANKSIEGED,  \
+                        CYCLONE, HELLIONTANK, THOR, THORAP, VIKING, VIKINGFIGHTER, MEDIVAC, LIBERATOR, \
+                        BANSHEE, RAVEN, BATTLECRUISER
+
+# TOSS UNITS
+from sc2.constants import PROBE, ZEALOT, SENTRY, STALKER, ADEPT, HIGHTEMPLAR, DARKTEMPLAR, ARCHON, OBSERVER, WARPPRISM, IMMORTAL, \
+                        COLOSSUS, DISRUPTOR, PHOENIX, VOIDRAY, ORACLE, TEMPEST, CARRIER, MOTHERSHIP
+
+def all_units():
+    to_return = {}
+    to_return.update(protoss_units())
+    to_return.update(terran_units())
+    return to_return
+
+def n_active_terran_units():
+    t_units = terran_units()
+    return sum([1 for k in t_units if t_units[k]["disabled"]==False])
+
+def serialize_namespace(namespace):
+    toss_units = protoss_units()
+    serialized = "-$$"
+    for unit_id in namespace:
+        serialized += "{},".format(toss_units[unit_id]["name"])
+
+    serialized = serialized[:-1] # remove last comma
+    serialized += "$$-"
+    return serialized
+
+def deserialize_namespace(namespace):
+    n_to_id = name_to_id()
+    ns = []
+    names = namespace.replace("-", "").replace("$$", "").split(",")
+    for name in names:
+        ns.append(n_to_id[name])
+    return ns
+
+
+
+def name_to_id():
+    return {
+        "probe": PROBE,
+        "zealot": ZEALOT,
+        "sentry": SENTRY,
+        "stalker": STALKER,
+        "adept": ADEPT,
+        "ht": HIGHTEMPLAR,
+        "dt": DARKTEMPLAR,
+        "archon": ARCHON,
+        "immortal": IMMORTAL,
+        "colossus": COLOSSUS,
+        "phoenix": PHOENIX,
+        "voidray": VOIDRAY,
+        "tempest": TEMPEST,
+        "carrier": CARRIER
+    }
+
+
+
+def protoss_units():
+        return {
+            PROBE: {
+                "name": "probe",
+                "supply": 1,
+                "counters": set([]),
+                "counteredby":set([]), # to be fixed in other entries
+                "utility_against":{
+                    MARINE: -10,
+                    MARAUDER: -10,
+                    REAPER: -10,
+                    GHOST: -10,
+                    HELLION: -10,
+                    WIDOWMINE: -10,
+                    SIEGETANK: -10,
+                    CYCLONE: -10,
+                    HELLIONTANK: -10,
+                    THOR: -10,
+                    THORAP: -10,
+                    VIKING: -10,
+                    VIKINGFIGHTER: -10,
+                    MEDIVAC: -10,
+                    LIBERATOR: -10,
+                    BANSHEE: -10,
+                    RAVEN: -10,
+                    BATTLECRUISER: -10
+                }
+            },
+            ZEALOT : {
+                "name": "zealot",
+                "supply": 2,
+                "counters": set([MARINE, HELLION]),
+                "utility_against":{
+                    MARINE: 5,
+                    MARAUDER: 9,
+                    REAPER: 6,
+                    GHOST: -2,
+                    HELLION: -4,
+                    WIDOWMINE: -4,
+                    SIEGETANK: 8,
+                    CYCLONE: 8,
+                    HELLIONTANK: -8,
+                    THOR: 5,
+                    THORAP: 5,
+                    VIKING: 0,
+                    VIKINGFIGHTER: 6,
+                    MEDIVAC: 0,
+                    LIBERATOR: -9,
+                    BANSHEE: -10,
+                    RAVEN: -10,
+                    BATTLECRUISER: -10
+                }
+            },
+            ADEPT: {
+                "name": "adept",
+                "supply": 2,
+                "counters": set([MARAUDER, SIEGETANK, CYCLONE]),
+                "utility_against":{
+                    MARINE: 7,
+                    MARAUDER: -6,
+                    REAPER: 5,
+                    GHOST: 5,
+                    HELLION: -5,
+                    WIDOWMINE: -6,
+                    SIEGETANK: -8,
+                    CYCLONE: -8,
+                    HELLIONTANK: -7,
+                    THOR: -9,
+                    THORAP: -9,
+                    VIKING: 0,
+                    VIKINGFIGHTER: -5,
+                    MEDIVAC: 0,
+                    LIBERATOR: -10,
+                    BANSHEE: -10,
+                    RAVEN: -10,
+                    BATTLECRUISER: -10
+                }
+            },
+            SENTRY: {
+                "name": "sentry",
+                "supply": 2,
+                "counters": set([HELLION, BANSHEE, SIEGETANK]),
+                "utility_against":{
+                    MARINE: 0,
+                    MARAUDER: 0,
+                    REAPER: 0,
+                    GHOST: 0,
+                    HELLION: 0,
+                    WIDOWMINE: 0,
+                    SIEGETANK: 0,
+                    CYCLONE: 0,
+                    HELLIONTANK: 0,
+                    THOR: 0,
+                    THORAP: 0,
+                    VIKING: 0,
+                    VIKINGFIGHTER: 0,
+                    MEDIVAC: 0,
+                    LIBERATOR: 0,
+                    BANSHEE: 0,
+                    RAVEN: 0,
+                    BATTLECRUISER: 0
+                }
+            },
+            STALKER: {
+                "name": "stalker",
+                "supply": 2,
+                "counters": set([MARAUDER, SIEGETANK]),
+                "utility_against":{
+                    MARINE: 4,
+                    MARAUDER: -5,
+                    REAPER: 9,
+                    GHOST: 8,
+                    HELLION: 9,
+                    WIDOWMINE: 3,
+                    SIEGETANK: -8,
+                    CYCLONE: -8,
+                    HELLIONTANK: 8,
+                    THOR: -2,
+                    THORAP: -2,
+                    VIKING: 10,
+                    VIKINGFIGHTER: 7,
+                    MEDIVAC: 10,
+                    LIBERATOR: 8,
+                    BANSHEE: 7,
+                    RAVEN: 10,
+                    BATTLECRUISER: 7
+                }
+            },
+            HIGHTEMPLAR: {
+                "name": "ht",
+                "supply": 2,
+                "counters": set([SIEGETANK, GHOST]),
+                "utility_against":{
+                    MARINE: 0,
+                    MARAUDER: 0,
+                    REAPER: 0,
+                    GHOST: 0,
+                    HELLION: 0,
+                    WIDOWMINE: 0,
+                    SIEGETANK: 0,
+                    CYCLONE: 0,
+                    HELLIONTANK: 0,
+                    THOR: 0,
+                    THORAP: 0,
+                    VIKING: 0,
+                    VIKINGFIGHTER: 0,
+                    MEDIVAC: 0,
+                    LIBERATOR: 0,
+                    BANSHEE: 0,
+                    RAVEN: 0,
+                    BATTLECRUISER: 0
+                }
+            },
+            DARKTEMPLAR: {
+                "name": "dt",
+                "supply": 2,
+                "counters": set([SIEGETANK, BANSHEE]),
+                "utility_against":{
+                    MARINE: 0,
+                    MARAUDER: 0,
+                    REAPER: 0,
+                    GHOST: 0,
+                    HELLION: 0,
+                    WIDOWMINE: 0,
+                    SIEGETANK: 0,
+                    CYCLONE: 0,
+                    HELLIONTANK: 0,
+                    THOR: 0,
+                    THORAP: 0,
+                    VIKING: 0,
+                    VIKINGFIGHTER: 0,
+                    MEDIVAC: 0,
+                    LIBERATOR: 0,
+                    BANSHEE: 0,
+                    RAVEN: 0,
+                    BATTLECRUISER: 0
+                }
+            },
+            ARCHON: {
+                "name": "archon",
+                "supply": 4,
+                "counters": set([]),
+                "utility_against":{
+                    MARINE: 5,
+                    MARAUDER: 5,
+                    REAPER: 5,
+                    GHOST: 5,
+                    HELLION: 5,
+                    WIDOWMINE: 5,
+                    SIEGETANK: 4,
+                    CYCLONE: 5,
+                    HELLIONTANK: 5,
+                    THOR: 5,
+                    THORAP: 5,
+                    VIKING: 9,
+                    VIKINGFIGHTER: 8,
+                    MEDIVAC: 7,
+                    LIBERATOR: 7,
+                    BANSHEE: 8,
+                    RAVEN: 9,
+                    BATTLECRUISER: 7
+                }
+            },
+            IMMORTAL: {
+                "name": "immortal",
+                "supply": 4,
+                "counters": set([MARINE, GHOST]),
+                "utility_against":{
+                    MARINE: 2,
+                    MARAUDER: 9,
+                    REAPER: 2,
+                    GHOST: 3,
+                    HELLION: 7,
+                    WIDOWMINE: 5,
+                    SIEGETANK: 9,
+                    CYCLONE: 8,
+                    HELLIONTANK: 7,
+                    THOR: 8,
+                    THORAP: 8,
+                    VIKING: 0,
+                    VIKINGFIGHTER: 7,
+                    MEDIVAC: 0,
+                    LIBERATOR: -8,
+                    BANSHEE: -10,
+                    RAVEN: -10,
+                    BATTLECRUISER: -10
+                }
+            },
+            COLOSSUS: {
+                "name": "colossus",
+                "supply": 6,
+                "counters": set([SIEGETANK, VIKING]),
+                "utility_against":{
+                    MARINE: 9,
+                    MARAUDER: 7,
+                    REAPER: 9,
+                    GHOST: 7,
+                    HELLION: 9,
+                    WIDOWMINE: 9,
+                    SIEGETANK: 6,
+                    CYCLONE: 5,
+                    HELLIONTANK: 9,
+                    THOR: 6,
+                    THORAP: 6,
+                    VIKING: -10,
+                    VIKINGFIGHTER: 6,
+                    MEDIVAC: 0,
+                    LIBERATOR: -10,
+                    BANSHEE: -10,
+                    RAVEN: -10,
+                    BATTLECRUISER: -10
+                }
+            },
+            OBSERVER: {
+                "name": "observer",
+                "supply": 1,
+                "counters": set([]),
+                "utility_against":{
+                    MARINE: 0,
+                    MARAUDER: 0,
+                    REAPER: 0,
+                    GHOST: 0,
+                    HELLION: 0,
+                    WIDOWMINE: 0,
+                    SIEGETANK: 0,
+                    CYCLONE: 0,
+                    HELLIONTANK: 0,
+                    THOR: 0,
+                    THORAP: 0,
+                    VIKING: 0,
+                    VIKINGFIGHTER: 0,
+                    MEDIVAC: 0,
+                    LIBERATOR: 0,
+                    BANSHEE: 0,
+                    RAVEN: 0,
+                    BATTLECRUISER: 0
+                }
+            },
+            PHOENIX: {
+                "name": "phoenix",
+                "supply": 2,
+                "counters": set([]),
+                "utility_against":{
+                    MARINE: -10,
+                    MARAUDER: 0,
+                    REAPER: 0,
+                    GHOST: -10,
+                    HELLION: 0,
+                    WIDOWMINE: 0,
+                    SIEGETANK: 0,
+                    CYCLONE: -7,
+                    HELLIONTANK: 0,
+                    THOR: -10,
+                    THORAP: -10,
+                    VIKING: 5,
+                    VIKINGFIGHTER: 0,
+                    MEDIVAC: 8,
+                    LIBERATOR: 7,
+                    BANSHEE: 10,
+                    RAVEN: 8,
+                    BATTLECRUISER: -2
+                }
+            },
+            VOIDRAY: {
+                "name": "voidray",
+                "supply": 4,
+                "counters": set([]),
+                "utility_against":{
+                    MARINE: -2,
+                    MARAUDER: 8,
+                    REAPER: 7,
+                    GHOST: 5,
+                    HELLION: 8,
+                    WIDOWMINE: 7,
+                    SIEGETANK: 8,
+                    CYCLONE: 6,
+                    HELLIONTANK: 8,
+                    THOR: 5,
+                    THORAP: 5,
+                    VIKING: 6,
+                    VIKINGFIGHTER: 8,
+                    MEDIVAC: 5,
+                    LIBERATOR: 5,
+                    BANSHEE: 10,
+                    RAVEN: 7,
+                    BATTLECRUISER: 8
+                }
+            },
+            TEMPEST: {
+                "name": "tempest",
+                "supply": 5,
+                "counters": set([]),
+                "utility_against":{
+                    MARINE: 0,
+                    MARAUDER: 0,
+                    REAPER: 0,
+                    GHOST: 0,
+                    HELLION: 0,
+                    WIDOWMINE: 0,
+                    SIEGETANK: 0,
+                    CYCLONE: 0,
+                    HELLIONTANK: 0,
+                    THOR: 0,
+                    THORAP: 0,
+                    VIKING: 0,
+                    VIKINGFIGHTER: 0,
+                    MEDIVAC: 0,
+                    LIBERATOR: 0,
+                    BANSHEE: 0,
+                    RAVEN: 0,
+                    BATTLECRUISER: 0
+                }
+            },
+            CARRIER: {
+                "name": "carrier",
+                "supply": 6,
+                "counters": set([]),
+                "utility_against":{
+                    MARINE: 0,
+                    MARAUDER: 0,
+                    REAPER: 0,
+                    GHOST: 0,
+                    HELLION: 0,
+                    WIDOWMINE: 0,
+                    SIEGETANK: 0,
+                    CYCLONE: 0,
+                    HELLIONTANK: 0,
+                    THOR: 0,
+                    THORAP: 0,
+                    VIKING: 0,
+                    VIKINGFIGHTER: 0,
+                    MEDIVAC: 0,
+                    LIBERATOR: 0,
+                    BANSHEE: 0,
+                    RAVEN: 0,
+                    BATTLECRUISER: 0
+                }
+            }
+        }
+def terran_units():
+    return {
+                MARINE: {
+                    "name": "marine",
+                    "counters": set([COLOSSUS]),
+                    "supply": 1,
+                    "disabled": False
+                },
+                MARAUDER: {
+                    "name": "marauder",
+                    "counters": set([IMMORTAL, VOIDRAY, ZEALOT]),
+                    "supply": 2,
+                    "disabled": False
+                },
+                REAPER: {
+                    "name": "reaper",
+                    "counters": set([STALKER]),
+                    "supply": 1,
+                    "disabled": False
+                },
+                GHOST: {
+                    "name": "ghost",
+                    "counters": set([STALKER]),
+                    "supply": 2,
+                    "disabled": False
+                },
+                HELLION: {
+                    "name": "hellion",
+                    "counters": set([STALKER]),
+                    "supply": 2,
+                    "disabled": False
+                },
+                HELLIONTANK: {
+                    "name": "hellbat",
+                    "supply": 2,
+                    "disabled": False
+                },
+                CYCLONE: {
+                    "name": "cyclone",
+                    "counters": set([STALKER]),
+                    "supply": 3,
+                    "disabled": False
+                },
+                SIEGETANK: {
+                    "name": "stank",
+                    "counters": set([IMMORTAL, VOIDRAY]),
+                    "supply": 3,
+                    "disabled": False
+                },
+                SIEGETANKSIEGED: {
+                    "name": "stank",
+                    "counters": set([IMMORTAL, VOIDRAY]),
+                    "supply": 3,
+                    "disabled": True
+                },
+                THOR: {
+                    "name": "thor",
+                    "counters": set([IMMORTAL]),
+                    "supply": 6,
+                    "disabled": False
+                },
+                THORAP: {
+                    "name": "thor",
+                    "counters": set([IMMORTAL]),
+                    "supply": 6,
+                    "disabled": False
+                },
+                BANSHEE: {
+                    "name": "banshee",
+                    "counters": set([VOIDRAY]),
+                    "supply": 3,
+                    "disabled": False
+                },
+                VIKING: {
+                    "name": "viking",
+                    "counters": set([STALKER]),
+                    "supply": 2,
+                    "disabled": False
+                },
+                VIKINGFIGHTER: {
+                    "name": "?",
+                    "counters": set([STALKER]),
+                    "supply": 2,
+                    "disabled": True
+                },
+                RAVEN: {
+                    "name": "raven",
+                    "counters": set([STALKER]),
+                    "supply": 2,
+                    "disabled": True
+                },
+                MEDIVAC: {
+                    "name": "medivac",
+                    "counters": set([STALKER, VOIDRAY]),
+                    "supply": 2,
+                    "disabled": False
+                },
+                BATTLECRUISER: {
+                    "name": "bc",
+                    "counters": set([VOIDRAY]),
+                    "supply": 6,
+                    "disabled": False
+                }
+            }
+#=====
+#./main.py
+
+
+from mathematical_model.model import ArmyCompModel
+from evaluator import army_generator
+from neural_training.Simulations import *
+
+# TOSS UNITS
+from sc2.constants import PROBE, ZEALOT, SENTRY, STALKER, ADEPT, HIGHTEMPLAR, DARKTEMPLAR, ARCHON, OBSERVER, WARPPRISM, IMMORTAL, \
+                        COLOSSUS, DISRUPTOR, PHOENIX, VOIDRAY, ORACLE, TEMPEST, CARRIER, MOTHERSHIP
+
+from 
+if __name__ == "__main__":
+    
+
+        
+    
+#=====
+#./main_train.py
+import tensorflow as tf
+from tensorflow import keras
+import sc2
+import random
+import time
+import numpy as np
+import math
+import matplotlib.pyplot as plt
+import threading
+import os
+from info import *
+from main_utils import *
+from sc2 import run_game, maps, Race, Difficulty, position, Result
+from sc2.player import Bot, Computer
+from neural_training.PolicyGradient import PolicyGradientAgent
+from neural_training.QLearningAgent import QLearningAgent
+from neural_training.Simulations import SimpleSimulation, HardSimulation
+
+
+hard_simulation_initial_namespace = [ZEALOT, STALKER, ADEPT, IMMORTAL, COLOSSUS, VOIDRAY, ARCHON]
+
+
+if __name__ == "__main__":
+    checkpoints_dir = "neural_training/checkpoints/"
+    simulation_location, load_checkpoint = get_user_inputs(checkpoints_dir)
+    simulation_dir = os.path.join(checkpoints_dir, simulation_location)
+
+
+    agent = None
+    namespace = None # default
+
+    if load_checkpoint:
+        alpha, gamma, actions, l1, l2, input_dims, namespace = get_agent_settings(simulation_dir)
+        namespace_serialized = serialize_namespace(namespace)
+        agent = PolicyGradientAgent(ALPHA=alpha, input_dims=input_dims, GAMMA=gamma,
+                                n_actions=actions, layer1_size=l1, layer2_size=l2,
+                                chkpt_dir=simulation_dir, action_namespace=namespace_serialized)
+        agent.load_checkpoint()
+        print("Checkpoint successfully loaded with following settings:")
+        print(agent)
+
+    else:
+        namespace, namespace_serialized = get_initial_namespace()
+        n_actions = len(namespace)
+        input_dims = 1 + n_actions + n_active_terran_units()
+        agent = PolicyGradientAgent(ALPHA=0.01, input_dims=input_dims, GAMMA=0.99,
+                                n_actions=n_actions, layer1_size=128, layer2_size=128,
+                                chkpt_dir=simulation_dir, action_namespace=namespace_serialized)
+
+    score_history = []
+    win_loss = [0, 0]
+    score = 0
+    num_episodes = int(input("How many simulations?\n> "))
+
+    for i in range(num_episodes):
+        print('episode: ', i,'score: ', score)
+        done = False
+        score = 0
+        #simulation = SimpleSimulation()
+        simulation = HardSimulation(namespace)
+        observation = simulation.get_current_observation()
+        while not done:
+            action = agent.choose_action(observation)
+            print("Action chose: {}".format(action))
+            observation_, reward, done, info = simulation.add_unit(action)
+            agent.store_transition(observation, action, reward)
+            observation = observation_
+            score += reward
+
+        score += simulation.simulate_exchange()
+
+        # Keep track of win/loss ratio
+        if score > 0:
+            win_loss[0] += 1
+        else:
+            win_loss[1] += 1
+
+        print("Result: {}".format(score))
+        agent.finish_transition_group(score)
+        score_history.append(score)
+        agent.learn()
+
+        agent.save_checkpoint()
+        del simulation
+
+        if i%100 == 0:
+            save_info(agent, win_loss, simulation_dir)
+
+    save_info(agent, win_loss, simulation_dir)
+#=====
+#./main_train_q.py
+import tensorflow as tf
+from tensorflow import keras
+import sc2
+import random
+import time
+import numpy as np
+import math
+import matplotlib.pyplot as plt
+import threading
+import os
+from info import *
+from main_utils import *
+from sc2 import run_game, maps, Race, Difficulty, position, Result
+from sc2.player import Bot, Computer
+from neural_training.QLearningAgent import QLearningAgent
+from neural_training.Simulations import SimpleSimulation, HardSimulation
+
+
+hard_simulation_initial_namespace = [ZEALOT, STALKER, ADEPT, IMMORTAL, COLOSSUS, VOIDRAY, ARCHON]
+
+
+if __name__ == "__main__":
+    checkpoints_dir = "neural_training/checkpoints/"
+    simulation_location, load_checkpoint = get_user_inputs(checkpoints_dir)
+    simulation_dir = os.path.join(checkpoints_dir, simulation_location)
+
+
+    agent = None
+    namespace = None # default
+
+    if load_checkpoint:
+        alpha, gamma, actions, l1, l2, input_dims, namespace = get_agent_settings(simulation_dir)
+        namespace_serialized = serialize_namespace(namespace)
+        agent = QLearningAgent(ALPHA=alpha, input_dims=input_dims, GAMMA=gamma,
+                                n_actions=actions, layer1_size=l1, layer2_size=l2,
+                                chkpt_dir=simulation_dir, action_namespace=namespace_serialized)
+        agent.load_checkpoint()
+        print("Checkpoint successfully loaded with following settings:")
+        print(agent)
+
+    else:
+        namespace, namespace_serialized = get_initial_namespace()
+        n_actions = len(namespace)
+        input_dims = 1 + n_actions + n_active_terran_units()
+        agent = QLearningAgent(ALPHA=0.01, input_dims=input_dims, GAMMA=0.99,
+                                n_actions=n_actions, layer1_size=128, layer2_size=128,
+                                chkpt_dir=simulation_dir, action_namespace=namespace_serialized)
+
+    score_history = []
+    eps_history = []
+    win_loss = [0, 0]
+    score = 0
+    scores = []
+
+    num_episodes = int(input("How many simulations?\n> "))
+
+    for i in range(num_episodes):
+
+        print('episode: ', i,'score: ', score)
+        done = False
+        score = 0
+        
+
+        simulation = HardSimulation(namespace)
+        observation = simulation.get_current_observation()
+        while not done:
+            action = agent.choose_action(observation)
+            print("Action chose: {}".format(action))
+            observation_, reward, done, info = simulation.add_unit(action)
+            agent.store_transition(observation, action, reward, observation_, int(done))
+            observation = observation_
+            score += reward
+
+        score += simulation.simulate_exchange()
+
+        # Keep track of win/loss ratio
+        if score > 0:
+            win_loss[0] += 1
+        else:
+            win_loss[1] += 1
+
+        print("Result: {}".format(score))
+        agent.finish_transition_group(score)
+
+        score_history.append(score)
+        eps_history.append(agent.e)
+
+        agent.learn()
+
+        agent.save_checkpoint()
+        del simulation
+
+        if i%100 == 0:
+            save_info(score_history, agent, win_loss, simulation_dir)
+
+    save_info(score_history, agent, win_loss, simulation_dir)#=====
+#./main_utils.py
+import random
+import time
+import numpy as np
+import math
+import matplotlib.pyplot as plt
+import threading
+import os
+import __main__
+
+if __main__.__file__ == "main_train.py":
+    from neural_training.PolicyGradient import PolicyGradientAgent
+    from info import *
+else:    
+    from .neural_training.PolicyGradient import PolicyGradientAgent
+    from .info import *
+
+def plotLearning(scores, filename, x=None, window=5):
+    N = len(scores)
+    average = np.empty(N)
+    for t in range(N):
+	    average[t] = np.mean(scores[max(0, t-window):(t+1)])
+    if x is None:
+        x = [i for i in range(N)]
+    plt.ylabel('Score')
+    plt.xlabel('Game')
+    plt.plot(x, average)
+    plt.savefig(filename)
+
+
+def get_user_inputs(checkpoints_dir):
+    simulation_location = input("Choose save location \n> ")
+    load_checkpoint = False
+    full_dir_location = os.path.join(os.path.abspath(os.getcwd()), checkpoints_dir, simulation_location)
+    if os.path.exists(full_dir_location):
+        if input("Do you want to load the previous checkpoint for this simulation? [y/n]\n> ") == "y":
+            load_checkpoint = True
+    else:
+        os.mkdir(full_dir_location)
+
+    return simulation_location, load_checkpoint
+
+def get_agent_settings(simulation_dir):
+    info_path = os.path.join(simulation_dir, "info")
+
+    alpha = None
+    gamma = None
+    actions = None
+    l1 = None
+    l2 = None
+    input_dims = None
+    namespace = None
+
+    with open(info_path, "r") as info_file:
+        content = info_file.read()
+
+        alpha_i = content.find("ALPHA")
+        end = content.find("\n", alpha_i)
+
+        print("{}, {}".format(alpha_i, end))
+
+        alpha = float(content[alpha_i+7: end])
+
+        gamma_i = content.find("GAMMA")
+        end = content.find("\n", gamma_i)
+
+        print("{}, {}".format(gamma_i, end))
+        gamma = float(content[gamma_i+7: end])
+
+        actions_i = content.find("n_actions")
+        end = content.find("\n", actions_i)
+        actions = int(content[actions_i + 11: end])
+
+        l1_i = content.find("L1")
+        end = content.find("\n", l1_i)
+        l1 = int(content[l1_i+4: end])
+
+        l2_i = content.find("L2")
+        end = content.find("\n", l2_i)
+        l2 = int(content[l2_i+4: end])
+
+        input_dims_i = content.find("input_dims")
+        end = content.find("\n", input_dims_i)
+        input_dims = int(content[input_dims_i+12: end])
+
+        namespace_i = content.find("-$$")
+        namespace_end = content.find("$$-")
+        ns_string = content[namespace_i+3 : namespace_end]
+        namespace = deserialize_namespace(ns_string)
+
+    return alpha, gamma, actions, l1, l2, input_dims, namespace
+
+
+def get_initial_namespace():
+    namespace = []
+    print("Press [y/n] to choose which units the agent can use to counter the enemy army.\n\n")
+    dictt = name_to_id()
+    ok = "n"
+    while ok != "y":
+        namespace = []
+        for name in dictt:
+            if input("Use {}? [y/n]\n>".format(name)) == "y":
+                namespace.append(dictt[name])
+        print("Initialized following namespace: {}".format(namespace))
+        ok = input("Proceed? [y/n]")
+
+    serialized = serialize_namespace(namespace)
+    return namespace, serialized
+
+
+
+def save_info(score_history, agent, win_loss, save_dir):
+    win_ratio = (win_loss[0]/(win_loss[0]+win_loss[1]))
+    with open(os.path.join(save_dir, "info"), "w+") as f:
+        f.write("{}\nWin ratio: {}".format(repr(agent), win_ratio))
+
+    graphname = os.path.join(save_dir, 'graph.png')
+    plotLearning(score_history, filename=graphname, window=25)
+
+
+
+def load_policy_gradient(name, path_offset=""):
+    checkpoints_dir = os.path.join(path_offset, "neural_training/checkpoints/")
+    simulation_location = name
+    simulation_dir = os.path.join(checkpoints_dir, simulation_location)    
+
+    net_name = name.replace("_", "")
+    alpha, gamma, actions, l1, l2, input_dims, namespace = get_agent_settings(simulation_dir)
+    namespace_serialized = serialize_namespace(namespace)
+    agent = PolicyGradientAgent(ALPHA=alpha, input_dims=input_dims, GAMMA=gamma,
+                            n_actions=actions, layer1_size=l1, layer2_size=l2,
+                            chkpt_dir=simulation_dir, action_namespace=namespace_serialized, 
+                            network_name=net_name)                     
+    agent.load_checkpoint()
+    return agent#=====
+#./map_testing
+#=====
+#./map_testing/map.SC2Map
+#=====
+#./map_testing/TrainingEnvironment.SC2Map
+#=====
+#./mathematical_model
+#=====
+#./mathematical_model/model.py
+from info import protoss_units
+
+class ArmyCompModel:
+
+    def __init__(self, enemy_units):
+        self.enemy_units = enemy_units
+        print("------")
+        print(enemy_units)
+        print("------")
+
+        self.enemy_unit_types = []
+        self.init_enemy_unit_types()
+
+        self.protoss_units = protoss_units()
+
+        self.units = []
+        self.init_protoss_units_by_utility()
+
+    def init_enemy_unit_types(self):
+        for e in self.enemy_units:
+            self.enemy_unit_types.append(e[0])
+
+    def sort_append(self, unit, utility):
+        if len(self.units) == 0:
+            self.units.append([unit, utility])
+        else:
+            for i, e in enumerate(self.units):
+                if e[1] < utility:
+                    self.units.insert(i, [unit, utility])
+                    return
+
+        # nothing was appended
+        self.units.append([unit, utility])
+
+
+
+    def compute_utility(self, unit):
+        utility = 0
+        for e in self.enemy_units:
+            u      = e[0]
+            amount = e[1]
+            utility += self.protoss_units[unit]["utility_against"][u] * amount
+        return utility
+
+    def init_protoss_units_by_utility(self):
+        for unit in self.protoss_units:
+            self.sort_append(unit, self.compute_utility(unit))
+
+        self.normalize_utilities()
+
+    def normalize_utilities(self):
+        total = 0
+        for e in self.units:
+            total += e[1]
+
+        if total == 0:
+            total = 1
+            
+        for e in self.units:
+            e[1] = e[1]/total
+
+    def percentage_of(self, unit):
+        """
+        To be implemented
+        """
+        return ""
+
+    def normalize_percentages(self, composition):
+        """
+        Yet another one to be implemented
+        """
+        return ""
+
+    def utility_of(self, unit_tag):
+        for e in self.units:
+            if e[0] == unit_tag:
+                return e[1]
+        return None
+
+    def army_comp(self):
+        countered_units = set()
+        table = protoss_units()
+        composition = []
+        for unit in self.units:
+            counters = table[unit]["counters"]
+            percentage = 0
+            for c in counters:
+                if c not in countered_units and c in self.enemy_units:
+                    countered_units.add(c)
+                    percentage_of_c = self.percentage_of(c)
+                    percentage += percentage_of_c
+            composition.append((unit, percentage))
+
+            # break condition if we countered all enemy units
+            if len(countered_units) == len(self.enemy_units):
+                break
+
+        return self.normalize_percentages(composition)
+#=====
+#./mathematical_model/__init__.py
+#=====
+#./mathematical_model/__pycache__
+#=====
+#./mathematical_model/__pycache__/model.cpython-37.pyc
+#=====
+#./mathematical_model/__pycache__/__init__.cpython-37.pyc
+#=====
+#./neural_training
+#=====
+#./neural_training/checkpoints
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards/checkpoint
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards/events.out.tfevents.1583337322.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards/events.out.tfevents.1583337368.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards/events.out.tfevents.1583337420.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards/events.out.tfevents.1583337450.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards/graph.png
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards/info
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards_2
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards_2/checkpoint
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards_2/events.out.tfevents.1583743075.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards_2/events.out.tfevents.1583743112.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards_2/events.out.tfevents.1583743315.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards_2/events.out.tfevents.1583743422.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards_2/events.out.tfevents.1583743545.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards_2/events.out.tfevents.1583743595.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards_2/graph.png
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards_2/info
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards_2/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards_2/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/128_128_hard_allunits_highrewards_2/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/128_128_hard_mixedunits_highrewards
+#=====
+#./neural_training/checkpoints/128_128_hard_mixedunits_highrewards/checkpoint
+#=====
+#./neural_training/checkpoints/128_128_hard_mixedunits_highrewards/events.out.tfevents.1583757867.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_mixedunits_highrewards/graph.png
+#=====
+#./neural_training/checkpoints/128_128_hard_mixedunits_highrewards/info
+#=====
+#./neural_training/checkpoints/128_128_hard_mixedunits_highrewards/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/128_128_hard_mixedunits_highrewards/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/128_128_hard_mixedunits_highrewards/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/128_128_hard_mixedunits_highrewards_supplyobs
+#=====
+#./neural_training/checkpoints/128_128_hard_mixedunits_highrewards_supplyobs/checkpoint
+#=====
+#./neural_training/checkpoints/128_128_hard_mixedunits_highrewards_supplyobs/events.out.tfevents.1583763671.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_mixedunits_highrewards_supplyobs/graph.png
+#=====
+#./neural_training/checkpoints/128_128_hard_mixedunits_highrewards_supplyobs/info
+#=====
+#./neural_training/checkpoints/128_128_hard_mixedunits_highrewards_supplyobs/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/128_128_hard_mixedunits_highrewards_supplyobs/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/128_128_hard_mixedunits_highrewards_supplyobs/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air/checkpoint
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air/events.out.tfevents.1582570117.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air/graph.png
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air/info
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air/i_graph.png
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_2
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_2/0_200_graph.png
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_2/checkpoint
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_2/events.out.tfevents.1582570494.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_2/graph.png
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_2/info
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_2/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_2/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_2/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_3
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_3/checkpoint
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_3/events.out.tfevents.1582638422.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_3/events.out.tfevents.1582638458.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_3/graph.png
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_3/info
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_3/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_3/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_3/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_4
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_4/checkpoint
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_4/events.out.tfevents.1582640168.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_4/events.out.tfevents.1582640209.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_4/graph.png
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_4/info
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_4/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_4/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_4/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_5_negloss
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_5_negloss/checkpoint
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_5_negloss/events.out.tfevents.1582651477.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_5_negloss/events.out.tfevents.1582651517.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_5_negloss/graph.png
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_5_negloss/info
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_5_negloss/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_5_negloss/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_5_negloss/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_6_highrewards
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_6_highrewards/checkpoint
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_6_highrewards/events.out.tfevents.1582655272.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_6_highrewards/events.out.tfevents.1582655494.JacosUbunty
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_6_highrewards/graph.png
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_6_highrewards/info
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_6_highrewards/info2
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_6_highrewards/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_6_highrewards/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/128_128_hard_no_air_6_highrewards/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/49x49_simple
+#=====
+#./neural_training/checkpoints/49x49_simple/49x49_simulation.png
+#=====
+#./neural_training/checkpoints/49x49_simple/checkpoint
+#=====
+#./neural_training/checkpoints/49x49_simple/graph.png
+#=====
+#./neural_training/checkpoints/49x49_simple/info
+#=====
+#./neural_training/checkpoints/49x49_simple/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/49x49_simple/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/49x49_simple/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/49x49_simple_modelreward
+#=====
+#./neural_training/checkpoints/49x49_simple_modelreward/checkpoint
+#=====
+#./neural_training/checkpoints/49x49_simple_modelreward/graph.png
+#=====
+#./neural_training/checkpoints/49x49_simple_modelreward/graph1.png
+#=====
+#./neural_training/checkpoints/49x49_simple_modelreward/info
+#=====
+#./neural_training/checkpoints/49x49_simple_modelreward/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/49x49_simple_modelreward/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/49x49_simple_modelreward/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/49x49_simple_normalized
+#=====
+#./neural_training/checkpoints/49x49_simple_normalized/checkpoint
+#=====
+#./neural_training/checkpoints/49x49_simple_normalized/graph.png
+#=====
+#./neural_training/checkpoints/49x49_simple_normalized/info
+#=====
+#./neural_training/checkpoints/49x49_simple_normalized/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/49x49_simple_normalized/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/49x49_simple_normalized/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/49x49_simple_normalized_relu
+#=====
+#./neural_training/checkpoints/49x49_simple_normalized_relu/checkpoint
+#=====
+#./neural_training/checkpoints/49x49_simple_normalized_relu/graph.png
+#=====
+#./neural_training/checkpoints/49x49_simple_normalized_relu/info
+#=====
+#./neural_training/checkpoints/49x49_simple_normalized_relu/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/49x49_simple_normalized_relu/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/49x49_simple_normalized_relu/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/49x49_simple_secondtry
+#=====
+#./neural_training/checkpoints/49x49_simple_secondtry/checkpoint
+#=====
+#./neural_training/checkpoints/49x49_simple_secondtry/graph.png
+#=====
+#./neural_training/checkpoints/49x49_simple_secondtry/info
+#=====
+#./neural_training/checkpoints/49x49_simple_secondtry/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/49x49_simple_secondtry/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/49x49_simple_secondtry/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/49x49_thirdtry
+#=====
+#./neural_training/checkpoints/49x49_thirdtry/checkpoint
+#=====
+#./neural_training/checkpoints/49x49_thirdtry/graph.png
+#=====
+#./neural_training/checkpoints/49x49_thirdtry/info
+#=====
+#./neural_training/checkpoints/49x49_thirdtry/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/49x49_thirdtry/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/49x49_thirdtry/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/49_simple_normalized
+#=====
+#./neural_training/checkpoints/49_simple_normalized/checkpoint
+#=====
+#./neural_training/checkpoints/49_simple_normalized/events.out.tfevents.1583947280.DESKTOP-3BFPOEC
+#=====
+#./neural_training/checkpoints/49_simple_normalized/graph.png
+#=====
+#./neural_training/checkpoints/49_simple_normalized/info
+#=====
+#./neural_training/checkpoints/49_simple_normalized/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/49_simple_normalized/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/49_simple_normalized/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/49_simple_normalized_tanh
+#=====
+#./neural_training/checkpoints/49_simple_normalized_tanh/checkpoint
+#=====
+#./neural_training/checkpoints/49_simple_normalized_tanh/graph.png
+#=====
+#./neural_training/checkpoints/49_simple_normalized_tanh/info
+#=====
+#./neural_training/checkpoints/49_simple_normalized_tanh/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/49_simple_normalized_tanh/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/49_simple_normalized_tanh/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/56x56_simple
+#=====
+#./neural_training/checkpoints/56x56_simple/checkpoint
+#=====
+#./neural_training/checkpoints/56x56_simple/graph.png
+#=====
+#./neural_training/checkpoints/56x56_simple/info
+#=====
+#./neural_training/checkpoints/56x56_simple/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/56x56_simple/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/56x56_simple/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/64x64_hard_no_air
+#=====
+#./neural_training/checkpoints/64x64_hard_no_air/checkpoint
+#=====
+#./neural_training/checkpoints/64x64_hard_no_air/graph.png
+#=====
+#./neural_training/checkpoints/64x64_hard_no_air/info
+#=====
+#./neural_training/checkpoints/64x64_hard_no_air/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/64x64_hard_no_air/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/64x64_hard_no_air/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/64x64_simple
+#=====
+#./neural_training/checkpoints/64x64_simple/checkpoint
+#=====
+#./neural_training/checkpoints/64x64_simple/graph.png
+#=====
+#./neural_training/checkpoints/64x64_simple/info
+#=====
+#./neural_training/checkpoints/64x64_simple/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/64x64_simple/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/64x64_simple/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/nonexist
+#=====
+#./neural_training/checkpoints/ql
+#=====
+#./neural_training/checkpoints/ql/checkpoint
+#=====
+#./neural_training/checkpoints/ql/events.out.tfevents.1583768681.JacosUbunty
+#=====
+#./neural_training/checkpoints/ql/events.out.tfevents.1583768990.JacosUbunty
+#=====
+#./neural_training/checkpoints/ql/events.out.tfevents.1583769145.JacosUbunty
+#=====
+#./neural_training/checkpoints/ql/events.out.tfevents.1583769275.JacosUbunty
+#=====
+#./neural_training/checkpoints/ql/events.out.tfevents.1583769510.JacosUbunty
+#=====
+#./neural_training/checkpoints/ql/events.out.tfevents.1583769586.JacosUbunty
+#=====
+#./neural_training/checkpoints/ql/events.out.tfevents.1583769619.JacosUbunty
+#=====
+#./neural_training/checkpoints/ql/events.out.tfevents.1583769655.JacosUbunty
+#=====
+#./neural_training/checkpoints/ql/events.out.tfevents.1583769747.JacosUbunty
+#=====
+#./neural_training/checkpoints/ql/graph.png
+#=====
+#./neural_training/checkpoints/ql/info
+#=====
+#./neural_training/checkpoints/ql/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/ql/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/ql/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/Q_128_128_hard_highrewards_mixunits
+#=====
+#./neural_training/checkpoints/Q_128_128_hard_highrewards_mixunits/checkpoint
+#=====
+#./neural_training/checkpoints/Q_128_128_hard_highrewards_mixunits/events.out.tfevents.1583769883.JacosUbunty
+#=====
+#./neural_training/checkpoints/Q_128_128_hard_highrewards_mixunits/graph.png
+#=====
+#./neural_training/checkpoints/Q_128_128_hard_highrewards_mixunits/info
+#=====
+#./neural_training/checkpoints/Q_128_128_hard_highrewards_mixunits/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/Q_128_128_hard_highrewards_mixunits/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/Q_128_128_hard_highrewards_mixunits/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/test
+#=====
+#./neural_training/checkpoints/test/checkpoint
+#=====
+#./neural_training/checkpoints/test/events.out.tfevents.1583434435.JacosUbunty
+#=====
+#./neural_training/checkpoints/test/events.out.tfevents.1583434457.JacosUbunty
+#=====
+#./neural_training/checkpoints/test/graph.png
+#=====
+#./neural_training/checkpoints/test/info
+#=====
+#./neural_training/checkpoints/test/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/test/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/test/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/testing
+#=====
+#./neural_training/checkpoints/testing/checkpoint
+#=====
+#./neural_training/checkpoints/testing/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/checkpoints/testing/policy_network.ckpt.index
+#=====
+#./neural_training/checkpoints/testing/policy_network.ckpt.meta
+#=====
+#./neural_training/checkpoints/testing_ql
+#=====
+#./neural_training/checkpoints/testing_ql/events.out.tfevents.1583767551.JacosUbunty
+#=====
+#./neural_training/checkpoints/testing_ql/events.out.tfevents.1583767601.JacosUbunty
+#=====
+#./neural_training/checkpoints/testing_ql/events.out.tfevents.1583767679.JacosUbunty
+#=====
+#./neural_training/checkpoints/testing_ql/events.out.tfevents.1583767728.JacosUbunty
+#=====
+#./neural_training/checkpoints/testing_ql/events.out.tfevents.1583767757.JacosUbunty
+#=====
+#./neural_training/continuous_training
+#=====
+#./neural_training/continuous_training/ContinuousAgent.py
+
+import sc2
+import random
+import time
+import numpy as np
+import math
+import matplotlib.pyplot as plt
+import threading
+from sc2 import run_game, maps, Race, Difficulty, position, Result
+from sc2.player import Bot, Computer
+from info import terran_units
+from flask import Flask
+from flask_socketio import SocketIO, emit
+import logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+
+
+class ContinuousSimulatorAgent(sc2.BotAI):
+    
+    def __init__(self):
+        self._init_socket()
+        self.setting_commands = False
+        self.next_commands = []
+        self.total_supply = 0
+        self.simulation_is_running = False
+        self.terran_units_info = terran_units()
+
+        self.beginning_time = 0
+
+    def _init_socket(self):
+        app = Flask(__name__)
+        app.config['SECRET_KEY'] = 'secret!'
+        socketio = SocketIO(app) 
+        
+
+        @socketio.on("connect")
+        def connect():
+            print("Neural Network connected")
+        @socketio.on("new_simulation")
+        def new_simulation(commands, total_army_supply):
+            print("On new simulation")
+            self.next_commands = commands
+            self.total_supply  = total_army_supply
+
+        self.socket = socketio
+        self.app    = app
+        threading.Thread(target=self._run_socket_listener).start()
+
+    def _run_socket_listener(self):
+        self.socket.run(self.app, port=3000)
+
+
+    async def start_new_exchange(self):
+        for command in self.next_commands:
+            await self.chat_send(command)
+        self.next_commands = []    
+        await self.chat_send("-begin")
+        self.simulation_is_running = True 
+        print("end start_new_exchange, supply: {}".format(self.supply_army))   
+
+    def normalize_supply_left(self, leftover):
+        return leftover/self.total_supply
+
+    def compute_enemy_supply_belief(self):
+        enemy_leftover_supply = 0
+        for unit in self.known_enemy_units:
+            u_type = unit.type_id
+            enemy_leftover_supply += self.terran_units_info[u_type]["supply"]
+        return enemy_leftover_supply    
+
+    # 165 iterations per minute
+    async def on_step(self, iteration):
+        if len(self.next_commands) > 0:
+            await self.start_new_exchange()
+            self.beginning_time = self.time
+            return
+
+        if self.simulation_is_running:
+            current_enemy_supply = self.compute_enemy_supply_belief()
+            current_ally_supply  = self.supply_army 
+
+            print("{}, {}".format(self.time, self.beginning_time))
+            if (current_ally_supply == 0 and current_enemy_supply ==0):
+                # Bug, that's not a good way to fix this
+                return
+            if (current_ally_supply == 0 or self.time - self.beginning_time > 60):
+                # Lose, emit result
+                reward = (-1) * self.normalize_supply_left(current_enemy_supply)
+                self.simulation_is_running = False
+                await self.chat_send("-reset")
+                self.socket.emit("result", reward)
+            elif (current_enemy_supply == 0):    
+                # Win, emit result
+                reward = self.normalize_supply_left(self.supply_army)               
+                self.simulation_is_running = False
+                await self.chat_send("-reset")
+                self.socket.emit("result", reward)
+
+                #or iteration - self.beginning_iteration > 165#=====
+#./neural_training/continuous_training/main_continuous.py
+import tensorflow as tf
+from tensorflow import keras
+import sc2
+import random
+import time
+import numpy as np
+import math
+import matplotlib.pyplot as plt 
+import threading
+from sc2 import run_game, maps, Race, Difficulty, position, Result
+from sc2.player import Bot, Computer
+from PolicyGradient import PolicyGradientAgent
+from Simulations import SimpleSimulation
+
+from socketIO_client import SocketIO, LoggingNamespace
+import logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+
+class Exchange:
+
+    def __init__(self):
+            # generating army
+            self.n_marauders = 0
+            self.n_hellbats  = 0
+            self.n_banshees  = 0
+            self.commands = []
+
+            rand = random.uniform(0,4)
+            if rand <= 1:
+                self.n_marauders = round(random.uniform(1, 20))
+            elif rand <= 2:
+                self.n_hellbats  = round(random.uniform(2, 10))
+            elif rand <= 3:
+                self.n_banshees  = round(random.uniform(1, 10))
+            else:
+                self.n_marauders = round(random.uniform(1, 20))         
+
+            self.n_zealots    = 0
+            self.n_stalkers   = 0
+            self.n_phoenixes  = 0
+            self.n_probes     = 0
+
+            self.unit_namespace = ["zealot", "stalker", "phoenix", "probe", "marauder", "hellbat", "banshee"]
+            self.current_observation = [0, 0, 0, 0, self.n_marauders, self.n_hellbats, self.n_banshees]
+
+
+            self.total_supply = self.n_marauders * 2 + self.n_hellbats * 2 + self.n_banshees * 3
+            print("Enemy supply: {}".format(self.total_supply))
+            self.current_supply = 0
+            self.ready = False
+
+            self.result = None
+
+    def add_unit(self, unit):
+        if unit == 0:
+            self.n_zealots += 1
+            self.current_supply += 2
+            self.current_observation[0] += 1    
+        elif unit == 1:
+            self.n_stalkers += 1
+            self.current_supply += 2
+            self.current_observation[1] += 1 
+        elif unit == 3:
+            self.n_phoenixes += 1
+            self.current_supply += 2
+            self.current_observation[2] += 1    
+        else:
+            self.n_probes += 1
+            self.current_supply += 1
+            self.current_observation[3] += 1 
+        if self.current_supply >= self.total_supply:
+                self.initialize_in_game_simulation_commands()
+                self.ready = True    
+
+        #observation_, reward, done, info         
+        return self.get_current_observation(), 0, self.ready, ""  
+    
+    def initialize_in_game_simulation_commands(self):
+        for u, n in zip(self.unit_namespace, self.current_observation):
+            self.commands.append("-{} {}".format(u, n))
+        print("Initialized commands: {}".format(self.commands))         
+
+    def get_current_observation(self):
+        return np.array(self.current_observation)        
+
+
+def plotLearning(scores, filename, x=None, window=5):   
+    N = len(scores)
+    running_avg = np.empty(N)
+    for t in range(N):
+	    running_avg[t] = np.mean(scores[max(0, t-window):(t+1)])
+    if x is None:
+        x = [i for i in range(N)]
+    plt.ylabel('Score')       
+    plt.xlabel('Game')                     
+    plt.plot(x, running_avg)
+    plt.savefig(filename)
+
+class Main:
+
+    def __init__(self, num_episodes):
+        self.socket = SocketIO('localhost', 3000, LoggingNamespace)
+        self.socket.on("result", self.on_result)     
+
+        self.iteration = 0
+        self.score_history = []
+        self.num_episodes = num_episodes
+
+        self.agent = PolicyGradientAgent(ALPHA=0.0005, input_dims=7, GAMMA=0.99,
+                                n_actions=4, layer1_size=64, layer2_size=64,
+                                chkpt_dir='tmp/')
+                     
+        #agent.load_checkpoint()
+
+
+    def on_result(self,result):
+        print("result: {}".format(result))
+
+        self.score_history.append(result)
+        self.agent.learn()  
+        self.agent.save_checkpoint() 
+        self.iteration += 1
+
+        if self.iteration > self.num_episodes:
+            filename = 'last_run.png'
+            plotLearning(self.score_history, filename=filename, window=25)
+        else:
+            self.next_exchange()  
+
+
+    def next_exchange(self):
+        exchange = Exchange()
+        observation = exchange.get_current_observation()
+        done = False
+        while not done:
+            action = self.agent.choose_action(observation)
+            print(action)
+            observation_, reward, done, info = exchange.add_unit(action)
+            self.agent.store_transition(observation, action, reward)
+            observation = observation_
+
+        #score = simulation.simulate_exchange()   
+        self.socket.emit("new_simulation", exchange.commands, exchange.total_supply)
+        self.socket.wait() 
+
+          
+
+if __name__ == "__main__":
+    main = Main(50)
+    main.next_exchange()#=====
+#./neural_training/continuous_training/start_continuous_agent.py
+from sc2 import run_game, maps, Race, Difficulty, position, Result
+from sc2.player import Bot, Computer
+from SimulatorAgent import ContinuousSimulatorAgent
+
+
+if __name__ == "__main__":
+    run_game(maps.get("TrainingEnvironment_Continuous"),
+            [Bot(Race.Protoss, ContinuousSimulatorAgent()), Computer(Race.Terran, Difficulty.Easy)],
+            realtime=False) #=====
+#./neural_training/data
+#=====
+#./neural_training/data/checkpoint
+#=====
+#./neural_training/data/policy_network.ckpt.data-00000-of-00001
+#=====
+#./neural_training/data/policy_network.ckpt.index
+#=====
+#./neural_training/data/policy_network.ckpt.meta
+#=====
+#./neural_training/data/testing
+#=====
+#./neural_training/data/testing/info.py
+# TERRAN UNITS
+from sc2.constants import SCV, MULE, MARINE, MARAUDER, REAPER, GHOST, HELLION, WIDOWMINE, SIEGETANK, \
+                        CYCLONE, HELLIONTANK, THOR, VIKING, VIKINGFIGHTER, MEDIVAC, LIBERATOR, \
+                        BANSHEE, RAVEN, BATTLECRUISER
+
+# TOSS UNITS
+from sc2.constants import PROBE, ZEALOT, SENTRY, STALKER, ADEPT, HIGHTEMPLAR, DARKTEMPLAR, ARCHON, OBSERVER, WARPPRISM, IMMORTAL, \
+                        COLOSSUS, DISRUPTOR, PHOENIX, VOIDRAY, ORACLE, TEMPEST, CARRIER, MOTHERSHIP                        
+def terran_units():
+    return {
+                SCV: {
+                    "counters": set(),
+                    "visualization":{
+                        "color": (55, 0, 200),
+                        "size": 1
+                    },
+                    "supply": 1
+                },
+                MULE: {
+                    "counters": set(),
+                    "visualization":{
+                        "color": (65, 0, 210),
+                        "size": 1
+                    },
+                    "supply": 0
+                },
+                MARINE: {
+                    "counters": set([COLOSSUS]),
+                    "visualization":{
+                        "color": (55, 0, 155),
+                        "size": 1
+                    },
+                    "supply": 1
+                },
+                MARAUDER: {
+                    "counters": set([IMMORTAL, VOIDRAY, ZEALOT]),
+                    "visualization":{
+                        "color": (55, 0, 175),
+                        "size": 1
+                    },
+                    "supply": 2
+                },
+                REAPER: {
+                    "counters": set([STALKER]),
+                    "visualization":{
+                        "color": (35, 0, 155),
+                        "size": 1
+                    },
+                    "supply": 1
+                },
+                GHOST: {
+                    "counters": set([STALKER]),
+                    "visualization":{
+                        "color": (55, 0, 185),
+                        "size": 1
+                    },
+                    "supply": 2
+                },
+                HELLION: {
+                    "counters": set([STALKER]),
+                    "visualization":{
+                        "color": (35, 0, 135),
+                        "size": 1
+                    },
+                    "supply": 2
+                },
+                HELLIONTANK: {
+                    "supply": 2
+                },
+                SIEGETANK: {
+                    "counters": set([IMMORTAL, VOIDRAY]),
+                    "visualization":{
+                        "color": (25, 0, 105),
+                        "size": 1
+                    },
+                    "supply": 3
+                },
+                THOR: {
+                    "counters": set([IMMORTAL]),
+                    "visualization":{
+                        "color": (0, 0, 105),
+                        "size": 1
+                    },
+                    "supply": 6
+                },
+                BANSHEE: {
+                    "counters": set([VOIDRAY]),
+                    "visualization":{
+                        "color": (100, 0, 200),
+                        "size": 1
+                    },
+                    "supply": 3           
+                },
+                VIKING: {
+                    "counters": set([STALKER]),
+                    "visualization":{
+                        "color": (100, 0, 180),
+                        "size": 1
+                    },
+                    "supply": 2  
+                },
+                VIKINGFIGHTER: {
+                    "counters": set([STALKER]),
+                    "visualization":{
+                        "color": (110, 0, 190),
+                        "size": 1
+                    },
+                    "supply": 2  
+                },
+                RAVEN: {
+                    "counters": set([STALKER]),
+                    "visualization":{
+                        "color": (141, 0, 235),
+                        "size": 1
+                    },
+                    "supply": 2  
+                },
+                MEDIVAC: {
+                    "counters": set([STALKER, VOIDRAY]),
+                    "visualization":{
+                        "color": (141, 0, 255),
+                        "size": 1
+                    },
+                    "supply": 2
+                },
+                BATTLECRUISER: {
+                    "counters": set([VOIDRAY]),
+                    "visualization":{
+                        "color": (0, 0, 255),
+                        "size": 1
+                    },
+                    "supply": 6
+                }
+            }#=====
+#./neural_training/data/testing/test.py
+import sc2
+import random
+import time
+import numpy as np
+import math
+import matplotlib.pyplot as plt 
+import threading
+import info
+from sc2 import run_game, maps, Race, Difficulty, position, Result
+from sc2.player import Bot, Computer
+
+from flask import Flask
+from flask_socketio import SocketIO, emit
+
+
+
+class TestAgent(sc2.BotAI):
+    
+    def __init__(self):
+        self._init_socket()
+        self.setting_commands = False
+        self.next_commands = []
+        self.total_supply = 0
+        self.simulation_is_running = False
+        self.terran_units_info = info.terran_units()
+
+    def _init_socket(self):
+        app = Flask(__name__)
+        app.config['SECRET_KEY'] = 'secret!'
+        socketio = SocketIO(app) 
+        
+
+        @socketio.on("connect")
+        def connect():
+            print("Neural Network connected")
+        @socketio.on("new_simulation")
+        def new_simulation(commands, total_army_supply):
+            print("On new simulation")
+            self.next_commands = commands
+            self.total_supply  = total_army_supply
+
+        self.socket = socketio
+        self.app    = app
+        threading.Thread(target=self._run_socket_listener).start()
+
+    def _run_socket_listener(self):
+        self.socket.run(self.app, port=3000)
+
+
+    async def start_new_exchange(self):
+        for command in self.next_commands:
+            await self.chat_send(command)
+        self.next_commands = []    
+        await self.chat_send("-begin")
+        self.simulation_is_running = True 
+        print("end start_new_exchange, supply: {}".format(self.supply_army))   
+
+    def normalize_supply_left(self, leftover):
+        return leftover/self.total_supply
+
+    def compute_enemy_supply_belief(self):
+        enemy_leftover_supply = 0
+        for unit in self.known_enemy_units:
+            u_type = unit.type_id
+            enemy_leftover_supply += self.terran_units_info[u_type]["supply"]
+        return enemy_leftover_supply    
+
+    async def on_step(self, iteration):
+        if len(self.next_commands) > 0:
+            await self.start_new_exchange()
+            return
+
+        if self.simulation_is_running:
+            current_enemy_supply = self.compute_enemy_supply_belief()
+            current_ally_supply  = self.supply_army 
+            print("computed supplies {}, {}".format(current_enemy_supply, current_ally_supply))
+            if (current_ally_supply == 0 and current_enemy_supply ==0):
+                # Bug, that's not a good way to fix this
+                return
+            if (current_ally_supply == 0):
+                # Lose, emit result
+                reward = (-1) * self.normalize_supply_left(current_enemy_supply)
+                self.simulation_is_running = False
+                await self.chat_send("-reset")
+                self.socket.emit("result", reward)
+            elif (current_enemy_supply == 0):    
+                # Win, emit result
+                reward = self.normalize_supply_left(self.supply_army)               
+                self.simulation_is_running = False
+                await self.chat_send("-reset")
+                self.socket.emit("result", reward)
+
+              
+
+
+
+
+
+
+
+class Simulation():
+    
+    def __init__(self, steps):
+        self.steps = steps 
+        self.count = 0
+        self.agent = TestAgent()
+
+    def start_environment(self):
+        run_game(maps.get("TrainingEnvironment"),
+            [Bot(Race.Protoss, self.agent), Computer(Race.Terran, Difficulty.Easy)],
+            realtime=True) 
+    def start(self):  
+        t = threading.Thread(target=self.start_environment)
+        t.start()
+        while count < self.steps:
+            self.agent.set_next_commands(["-zealot 1", "-zealot 1", "-zealot 1", "-marine 3"])
+          
+
+
+if __name__ == "__main__":
+    run_game(maps.get("TrainingEnvironment_Continuous"),
+            [Bot(Race.Protoss, TestAgent()), Computer(Race.Terran, Difficulty.Easy)],
+            realtime=True) #=====
+#./neural_training/data/testing/test2.py
+
+
+
+
+from socketIO_client import SocketIO, LoggingNamespace
+
+
+class NN:
+
+    def __init__(self):
+        self.socket = SocketIO('localhost', 3000, LoggingNamespace)
+        self.socket.on("result", self.on_result)
+    
+
+    def on_result(self,result):
+        print("result: {}".format(result))
+        self.next_exchange()
+
+    def next_exchange(self):
+        self.socket.emit("new_simulation", ["-zealot 1", "-marauder 1"], 2)
+        self.socket.wait() 
+
+if __name__ == "__main__":
+    nn = NN()
+    nn.next_exchange()
+        
+        
+    
+   
+
+
+
+#=====
+#./neural_training/data/testing/__pycache__
+#=====
+#./neural_training/data/testing/__pycache__/info.cpython-37.pyc
+#=====
+#./neural_training/first_simulation.png
+#=====
+#./neural_training/info.py
+# TERRAN UNITS
+from sc2.constants import SCV, MULE, MARINE, MARAUDER, REAPER, GHOST, HELLION, WIDOWMINE, SIEGETANK, \
+                        CYCLONE, HELLIONTANK, THOR, VIKING, VIKINGFIGHTER, MEDIVAC, LIBERATOR, \
+                        BANSHEE, RAVEN, BATTLECRUISER
+
+# TOSS UNITS
+from sc2.constants import PROBE, ZEALOT, SENTRY, STALKER, ADEPT, HIGHTEMPLAR, DARKTEMPLAR, ARCHON, OBSERVER, WARPPRISM, IMMORTAL, \
+                        COLOSSUS, DISRUPTOR, PHOENIX, VOIDRAY, ORACLE, TEMPEST, CARRIER, MOTHERSHIP                        
+def terran_units():
+    return {
+                SCV: {
+                    "counters": set(),
+                    "visualization":{
+                        "color": (55, 0, 200),
+                        "size": 1
+                    },
+                    "supply": 1
+                },
+                MULE: {
+                    "counters": set(),
+                    "visualization":{
+                        "color": (65, 0, 210),
+                        "size": 1
+                    },
+                    "supply": 0
+                },
+                MARINE: {
+                    "counters": set([COLOSSUS]),
+                    "visualization":{
+                        "color": (55, 0, 155),
+                        "size": 1
+                    },
+                    "supply": 1
+                },
+                MARAUDER: {
+                    "counters": set([IMMORTAL, VOIDRAY, ZEALOT]),
+                    "visualization":{
+                        "color": (55, 0, 175),
+                        "size": 1
+                    },
+                    "supply": 2
+                },
+                REAPER: {
+                    "counters": set([STALKER]),
+                    "visualization":{
+                        "color": (35, 0, 155),
+                        "size": 1
+                    },
+                    "supply": 1
+                },
+                GHOST: {
+                    "counters": set([STALKER]),
+                    "visualization":{
+                        "color": (55, 0, 185),
+                        "size": 1
+                    },
+                    "supply": 2
+                },
+                HELLION: {
+                    "counters": set([STALKER]),
+                    "visualization":{
+                        "color": (35, 0, 135),
+                        "size": 1
+                    },
+                    "supply": 2
+                },
+                HELLIONTANK: {
+                    "supply": 2
+                },
+                SIEGETANK: {
+                    "counters": set([IMMORTAL, VOIDRAY]),
+                    "visualization":{
+                        "color": (25, 0, 105),
+                        "size": 1
+                    },
+                    "supply": 3
+                },
+                THOR: {
+                    "counters": set([IMMORTAL]),
+                    "visualization":{
+                        "color": (0, 0, 105),
+                        "size": 1
+                    },
+                    "supply": 6
+                },
+                BANSHEE: {
+                    "counters": set([VOIDRAY]),
+                    "visualization":{
+                        "color": (100, 0, 200),
+                        "size": 1
+                    },
+                    "supply": 3           
+                },
+                VIKING: {
+                    "counters": set([STALKER]),
+                    "visualization":{
+                        "color": (100, 0, 180),
+                        "size": 1
+                    },
+                    "supply": 2  
+                },
+                VIKINGFIGHTER: {
+                    "counters": set([STALKER]),
+                    "visualization":{
+                        "color": (110, 0, 190),
+                        "size": 1
+                    },
+                    "supply": 2  
+                },
+                RAVEN: {
+                    "counters": set([STALKER]),
+                    "visualization":{
+                        "color": (141, 0, 235),
+                        "size": 1
+                    },
+                    "supply": 2  
+                },
+                MEDIVAC: {
+                    "counters": set([STALKER, VOIDRAY]),
+                    "visualization":{
+                        "color": (141, 0, 255),
+                        "size": 1
+                    },
+                    "supply": 2
+                },
+                BATTLECRUISER: {
+                    "counters": set([VOIDRAY]),
+                    "visualization":{
+                        "color": (0, 0, 255),
+                        "size": 1
+                    },
+                    "supply": 6
+                }
+            }#=====
+#./neural_training/main.py
+import tensorflow as tf
+from tensorflow import keras
+import sc2
+import random
+import time
+import numpy as np
+import math
+import matplotlib.pyplot as plt
+import threading
+import os
+from sc2 import run_game, maps, Race, Difficulty, position, Result
+from sc2.player import Bot, Computer
+from PolicyGradient import PolicyGradientAgent
+from Simulations import SimpleSimulation
+
+
+
+
+
+
+
+class Simulation():
+
+    def __init__(self):
+        # generating army
+        self.n_marines   = round(random.uniform(0, 10))
+        self.n_marauders = round(random.uniform(0, 10))
+        self.n_tanks     = round(random.uniform(0, 5))
+        self.n_banshees  = round(random.uniform(0, 5))
+
+        self.n_zealots   = 0
+        self.n_stalkers  = 0
+        self.n_immortals = 0
+
+        self.current_observation = [0, 0, 0, self.n_marines, self.n_marauders, self.n_tanks, self.n_banshees]
+
+
+        self.total_supply = self.n_marines + self.n_marauders * 2 + self.n_tanks * 3 + self.n_banshees * 3
+        print("Enemy supply: {}".format(self.total_supply))
+        self.current_supply = 0
+        self.ready = False
+
+    def get_current_observation(self):
+        return np.array(self.current_observation)
+
+    def add_unit(self, unit):
+        if unit == 0:
+            self.n_zealots += 1
+            self.current_supply += 2
+            self.current_observation[0] += 1
+        elif unit == 1:
+            self.n_stalkers += 1
+            self.current_supply += 2
+            self.current_observation[1] += 1
+        else:
+            self.n_immortals += 1
+            self.current_supply += 4
+            self.current_observation[2] += 1
+        if self.current_supply >= self.total_supply:
+                self.ready = True
+
+        #observation_, reward, done, info
+        return self.get_current_observation(), 0, self.ready, ""
+
+
+    def simulate_exchange(self):
+        result = run_game(maps.get("TrainingEnvironment"),
+            [Bot(Race.Protoss, SimulatorAgent(self.current_observation)), Computer(Race.Terran, Difficulty.Easy)],
+            realtime=True)
+        if result == Result.Victory:
+            return 1
+        else:
+            return -1
+
+
+def plotLearning(scores, filename, x=None, window=5):
+    N = len(scores)
+    running_avg = np.empty(N)
+    for t in range(N):
+	    running_avg[t] = np.mean(scores[max(0, t-window):(t+1)])
+    if x is None:
+        x = [i for i in range(N)]
+    plt.ylabel('Score')
+    plt.xlabel('Game')
+    plt.plot(x, running_avg)
+    plt.savefig(filename)
+
+
+def get_user_inputs(checkpoints_dir):
+    simulation_location = input("Choose save location \n> ")
+    load_checkpoint = False
+    full_dir_location = os.path.join(os.path.abspath(os.getcwd()), checkpoints_dir, simulation_location)
+    if os.path.exists(full_dir_location):
+        if input("Do you want to load the previous checkpoint for this simulation? [y/n]\n> ") == "y":
+            load_checkpoint = True
+    if not load_checkpoint:
+        pass
+
+    return simulation_location, load_checkpoint
+
+def save_info(agent, win_loss, save_dir):
+    win_ratio = (win_loss[0]/(win_loss[0]+win_loss[1]))
+    with open(os.path.join(save_dir, "info"), "w+") as f:
+        f.write("{}\nWin ratio: {}".format(repr(agent), win_ratio))
+
+    graphname = os.path.join(save_dir, 'graph.png')
+    plotLearning(score_history, filename=graphname, window=25)
+
+if __name__ == "__main__":
+    checkpoints_dir = "checkpoints/"
+    simulation_location, load_checkpoint = get_user_inputs(checkpoints_dir)
+    simulation_dir = os.path.join(checkpoints_dir, simulation_location)
+
+
+
+    agent = PolicyGradientAgent(ALPHA=0.0001, input_dims=7, GAMMA=0.99,
+                                n_actions=4, layer1_size=49, layer2_size=49,
+                                chkpt_dir=simulation_dir)
+
+    if load_checkpoint:
+        agent.load_checkpoint()
+        print("Checkpoint successfully loaded")
+
+    score_history = []
+    win_loss = [0, 0]
+    score = 0
+    num_episodes = 1000
+
+    for i in range(num_episodes):
+        print('episode: ', i,'score: ', score)
+        done = False
+        score = 0
+        simulation = SimpleSimulation()
+        observation = simulation.get_current_observation()
+        while not done:
+            action = agent.choose_action(observation)
+            print("Action chose: {}".format(action))
+            observation_, reward, done, info = simulation.add_unit(action)
+            agent.store_transition(observation, action, reward)
+            observation = observation_
+            score += reward
+
+        score += simulation.simulate_exchange()
+
+        # Keep track of win/loss ratio
+        if score > 0:
+            win_loss[0] += 1
+        else:
+            win_loss[1] += 1
+
+        print("Result: {}".format(score))
+        agent.finish_transition_group(score)
+        score_history.append(score)
+        agent.learn()
+
+        agent.save_checkpoint()
+
+    save_info(agent, win_loss, simulation_dir)
+#=====
+#./neural_training/NeuralNetworks.py
+import os
+import tensorflow.compat.v1 as tf
+import numpy as np
+import ctypes
+
+class MultiLayerNN():
+    """
+    To be inherited, general two layer nn layout
+    """
+    def __init__(self, ALPHA, GAMMA=0.95, n_actions=4,
+                 layer1_size=16, layer2_size=16, input_dims=128,
+                 chkpt_dir='tmp/checkpoints', action_namespace=None, 
+                 network_name=None):
+        
+        self.network_name = "" if network_name is None else network_name
+
+        self.lr = ALPHA
+        self.gamma = GAMMA
+        self.n_actions = n_actions
+        self.action_space = [i for i in range(n_actions)]
+        self.layer1_size = layer1_size
+        self.layer2_size = layer2_size
+        self.input_dims = input_dims
+        self.state_memory = []
+        self.action_memory = []
+        self.reward_memory = []
+        self.sess = tf.Session()
+        self.build_net()
+        self.sess.run(tf.global_variables_initializer())
+
+        self.saver = tf.train.Saver()
+        #self.saver = tf.train.Saver([[v for v in tf.all_variables() if self.network_name in v.name]])
+
+        self.checkpoints_dir = chkpt_dir
+        self.checkpoint_file = os.path.join(chkpt_dir,'policy_network.ckpt')
+        self.action_namespace = action_namespace # serialized to string
+        #file_writer = tf.summary.FileWriter(self.checkpoints_dir, self.sess.graph)
+
+    def set_network_name(self, name):
+        self.name = name
+
+    def __repr__(self):
+        return "ALPHA: {}\nGAMMA: {}\nn_actions: {}\nL1: {}\nL2: {}\ninput_dims: {}\nnamespace: {}".format(self.lr,
+                            self.gamma, self.n_actions, self.layer1_size, self.layer2_size, self.input_dims, self.action_namespace)
+
+    def build_net(self):
+        pass
+
+    def load_checkpoint(self):
+        self.saver.restore(self.sess, self.checkpoint_file)
+
+    def save_checkpoint(self):
+        self.saver.save(self.sess, self.checkpoint_file)
+#=====
+#./neural_training/PolicyGradient.py
+import os
+import tensorflow.compat.v1 as tf
+import numpy as np
+import ctypes
+from .NeuralNetworks import MultiLayerNN
+
+#hllDll = ctypes.WinDLL("C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v10.0\\bin\\cudart64_100.dll")
+
+class PolicyGradientAgent(MultiLayerNN):
+    def __init__(self, *args, **kwargs):
+        super(PolicyGradientAgent, self).__init__(*args, **kwargs)
+
+    def build_net(self):
+        tf.disable_eager_execution()
+
+        with tf.variable_scope('parameters'):
+            self.input = tf.placeholder(tf.float32, shape=[None, self.input_dims], name='input')
+            self.label = tf.placeholder(tf.int32, shape=[None, ], name='label')
+            self.G = tf.placeholder(tf.float32, shape=[None,], name='G')
+
+        with tf.variable_scope('layer1'):
+            l1 = tf.layers.dense(inputs=self.input, units=self.layer1_size,
+                                 activation=tf.nn.relu)
+
+        with tf.variable_scope('layer2'):
+            l2 = tf.layers.dense(inputs=l1, units=self.layer2_size,
+                                 activation=tf.nn.relu)
+
+        with tf.variable_scope('layer3'):
+            l3 = tf.layers.dense(inputs=l2, units=self.n_actions,
+                                 activation=None)
+        self.actions = tf.nn.softmax(l3, name='actions')
+
+        with tf.variable_scope('loss'):
+            negative_log_probability = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                                                    logits=l3, labels=self.label)
+                                     
+
+            loss = negative_log_probability * self.G
+
+        with tf.variable_scope('train'):
+            self.train_op = tf.train.AdamOptimizer(self.lr).minimize(loss)
+
+    def choose_action(self, observation):
+        print(">>> Observation: {}".format(observation))
+        observation = observation[np.newaxis, :]
+        probabilities = self.sess.run(self.actions, feed_dict={self.input: observation})[0]
+        print(probabilities)
+        action = np.random.choice(self.action_space, p = probabilities )
+
+        return action
+
+    def store_transition(self, observation, action, reward):
+        self.state_memory.append(observation)
+        self.action_memory.append(action)
+        self.reward_memory.append(reward)
+
+    def finish_transition_group(self, reward):
+        self.reward_memory[-1] = reward
+
+    def learn(self):
+        state_memory = np.array(self.state_memory)
+        action_memory = np.array(self.action_memory)
+        reward_memory = np.array(self.reward_memory)
+
+        print("Reward Memory: {}".format(self.reward_memory))
+
+        G = np.zeros_like(reward_memory)
+        for t in range(len(reward_memory)):
+            G_sum = 0
+            discount = 1
+            for k in range(t, len(reward_memory)):
+                G_sum += reward_memory[k] * discount
+                discount *= self.gamma
+            G[t] = G_sum
+
+        #mean = np.mean(G)
+        #std = np.std(G) if np.std(G) > 0 else 1
+        #G = (G - mean) / std
+
+        print("G: {}".format(G))
+
+        _ = self.sess.run(self.train_op,
+                            feed_dict={self.input: state_memory,
+                                       self.label: action_memory,
+                                       self.G: G})
+        self.state_memory = []
+        self.action_memory = []
+        self.reward_memory = []
+#=====
+#./neural_training/PolicyGradient_old.py
+import os
+import tensorflow.compat.v1 as tf
+import numpy as np
+import ctypes
+
+#hllDll = ctypes.WinDLL("C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v10.0\\bin\\cudart64_100.dll")
+
+class PolicyGradientAgent():
+    def __init__(self, ALPHA, GAMMA=0.95, n_actions=4,
+                 layer1_size=16, layer2_size=16, input_dims=128,
+                 chkpt_dir='tmp/checkpoints'):
+        self.lr = ALPHA
+        self.gamma = GAMMA
+        self.n_actions = n_actions
+        self.action_space = [i for i in range(n_actions)]
+        self.layer1_size = layer1_size
+        self.layer2_size = layer2_size
+        self.input_dims = input_dims
+        self.state_memory = []
+        self.action_memory = []
+        self.reward_memory = []
+        self.sess = tf.Session()
+        self.build_net()
+        self.sess.run(tf.global_variables_initializer())
+        self.saver = tf.train.Saver()
+        self.checkpoint_file = os.path.join(chkpt_dir,'policy_network.ckpt')
+
+    def __repr__(self):
+        return "ALPHA: {}\nGAMMA: {}\nn_actions: {}\nL1: {}\nL2: {}\ninput_dims: {}".format(self.lr,
+                            self.gamma, self.n_actions, self.layer1_size, self.layer2_size, self.input_dims)
+
+    def build_net(self):
+        tf.disable_eager_execution()
+        with tf.variable_scope('parameters'):
+            self.input = tf.placeholder(tf.float32,
+                                        shape=[None, self.input_dims], name='input')
+            self.label = tf.placeholder(tf.int32,
+                                        shape=[None, ], name='label')
+            self.G = tf.placeholder(tf.float32, shape=[None,], name='G')
+
+        with tf.variable_scope('layer1'):
+            l1 = tf.layers.dense(inputs=self.input, units=self.layer1_size,
+                                 activation=tf.nn.relu)
+
+        with tf.variable_scope('layer2'):
+            l2 = tf.layers.dense(inputs=l1, units=self.layer2_size,
+                                 activation=tf.nn.relu)
+
+        with tf.variable_scope('layer3'):
+            l3 = tf.layers.dense(inputs=l2, units=self.n_actions,
+                                 activation=None)
+        self.actions = tf.nn.softmax(l3, name='actions')
+
+        with tf.variable_scope('loss'):
+            negative_log_probability = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                                                    logits=l3, labels=self.label)
+
+            loss = negative_log_probability * self.G
+
+        with tf.variable_scope('train'):
+            self.train_op = tf.train.AdamOptimizer(self.lr).minimize(loss)
+
+    def choose_action(self, observation):
+        print(observation)
+        observation = observation[np.newaxis, :]
+        probabilities = self.sess.run(self.actions, feed_dict={self.input: observation})[0]
+        action = np.random.choice(self.action_space, p = probabilities )
+
+        return action
+
+    def store_transition(self, observation, action, reward):
+        self.state_memory.append(observation)
+        self.action_memory.append(action)
+        self.reward_memory.append(reward)
+
+    def finish_transition_group(self, reward):
+        self.reward_memory[-1] = reward
+
+    def learn(self):
+        state_memory = np.array(self.state_memory)
+        action_memory = np.array(self.action_memory)
+        reward_memory = np.array(self.reward_memory)
+
+        print("Reward Memory: {}".format(self.reward_memory))
+
+        G = np.zeros_like(reward_memory)
+        for t in range(len(reward_memory)):
+            G_sum = 0
+            discount = 1
+            for k in range(t, len(reward_memory)):
+                G_sum += reward_memory[k] * discount
+                discount *= self.gamma
+            G[t] = G_sum
+        mean = np.mean(G)
+        std = np.std(G) if np.std(G) > 0 else 1
+        G = (G - mean) / std
+
+        print("G: {}".format(G))
+
+        _ = self.sess.run(self.train_op,
+                            feed_dict={self.input: state_memory,
+                                       self.label: action_memory,
+                                       self.G: G})
+        self.state_memory = []
+        self.action_memory = []
+        self.reward_memory = []
+
+    def load_checkpoint(self):
+        print("...Loading checkpoint...")
+        self.saver.restore(self.sess, self.checkpoint_file)
+
+    def save_checkpoint(self):
+        #print("...Saving checkpoint...")
+        self.saver.save(self.sess, self.checkpoint_file)
+#=====
+#./neural_training/QLearningAgent.py
+import os
+import tensorflow.compat.v1 as tf
+import numpy as np
+import ctypes
+from .NeuralNetworks import MultiLayerNN
+
+class QLearningAgent(MultiLayerNN):
+    def __init__(self, *args, **kwargs):
+        super(QLearningAgent, self).__init__(*args, **kwargs)
+        
+        self.mem_size = 10 # ?#
+        self.mem_cntr = 0
+        self.e = 0.1
+        self.batch_size = 10 # ?
+        self.epsilon_dec = 0.996
+        self.epsilon_end = 0.01
+
+        self.state_memory = np.zeros((self.mem_size, self.input_dims))
+        self.new_state_memory = np.zeros((self.mem_size, self.input_dims))
+        self.action_memory = np.zeros((self.mem_size, self.n_actions), dtype=np.int8)
+
+        self.reward_memory = np.zeros(self.mem_size)
+        self.tarminal_memory = np.zeros(self.mem_size, dtype=np.int8)    
+
+
+    def build_net(self):
+        tf.disable_eager_execution()
+        self.input = tf.placeholder(tf.float32, shape=[None, self.input_dims], name="input")
+        self.actions = tf.placeholder(tf.float32, shape=[None, self.n_actions], name="actions")
+        self.old_q_value = tf.placeholder(tf.float32, shape=[None, self.n_actions], name="q_value")
+
+        flatten = tf.layers.flatten(self.input)
+        first_dense  = tf.layers.dense(inputs=flatten, units=self.layer1_size, activation=tf.nn.relu)
+        second_dense = tf.layers.dense(inputs=first_dense, units=self.layer2_size, activation=tf.nn.relu)
+
+        self.q_values = tf.layers.dense(second_dense, self.n_actions)
+        self.loss = tf.reduce_mean(tf.square(self.q_values-self.old_q_value))
+        self.train_op = tf.train.AdamOptimizer(self.lr).minimize(self.loss)
+
+
+    def choose_action(self, observation):
+        observation = observation[np.newaxis, :]
+        random = np.random.random()
+        if random < self.e:
+            action = np.random.choice(self.action_space)
+        else:
+            actions = self.sess.run(self.q_values, feed_dict={self.input: observation})
+            action = np.argmax(actions) 
+        return action        
+
+    def store_transition(self, observation, action, reward, old_state, terminal):
+        index = self.mem_cntr % self.mem_size
+        self.state_memory[index] = observation
+        self.new_state_memory[index] = old_state
+        self.reward_memory[index] = reward
+        actions = np.zeros(self.n_actions)
+        actions[action] = 1.0
+        self.action_memory[index] = actions
+        self.terminal_memory = 1 - terminal
+        self.mem_cntr += 1    
+
+
+
+    def finish_transition_group(self, reward):
+        self.reward_memory[-1] = reward
+
+    def learn(self):
+        if self.mem_cntr > self.batch_size:
+            max_mem = self.mem_cntr if self.mem_cntr < self.mem_size else self.mem_size
+            batch = np.random.choice(max_mem, self.batch_size)
+
+            state_batch = self.state_memory[batch]
+            action_batch = self.action_memory[batch]
+            action_values = np.array(self.action_space, dtype=np.int8)
+            action_indices = np.dot(action_batch, action_values)
+            reward_batch = self.reward_memory[batch]
+            terminal_batch = self.terminal_memory
+
+            new_state_batch = state_batch.copy()
+
+            q_eval = self.sess.run(self.q_values, feed_dict={self.input: state_batch})
+            q_next = self.sess.run(self.q_values, feed_dict={self.input: new_state_batch})
+            q_target = q_eval.copy()
+
+            batch_index = np.arange(self.batch_size, dtype=np.int32)
+            q_target[:, action_indices] = reward_batch + self.gamma*np.max(q_next, axis=1)*terminal_batch
+
+            _ = self.sess.run(self.train_op, feed_dict={self.input: state_batch,
+                                                        self.actions: action_batch,
+                                                        self.old_q_value: q_target})
+
+            self.e = self.e*self.epsilon_dec if self.e > self.epsilon_end else self.epsilon_end
+
+
+
+
+
+
+
+
+#=====
+#./neural_training/Simulations.py
+import sc2
+import random
+import time
+import numpy as np
+import math
+import matplotlib.pyplot as plt
+import time
+from sc2 import run_game, maps, Race, Difficulty, position, Result
+from sc2.player import Bot, Computer
+from .SimulatorAgent import SimulatorAgent
+from mathematical_model import model
+from evaluator import army_generator
+from info import *
+
+terran_units  = terran_units()
+protoss_units = protoss_units()
+all_units     = all_units()
+
+
+class Simulation:
+
+    def __init__(self):
+        pass
+
+    def on_end(self, result):
+        print("ON END CALLED WITH: {}".format(result))
+        self.result = result
+
+    def simulate_exchange(self):
+        result = run_game(maps.get("TrainingEnvironment"),
+            [Bot(Race.Protoss, SimulatorAgent(self.current_observation, self.total_supply, self.commands, self.on_end)), Computer(Race.Terran, Difficulty.Easy)],
+            realtime=False)
+        print("Result in sim {}".format(self.result))
+        return self.result
+
+
+class SimpleSimulation():
+
+    def __init__(self):
+        # generating army
+        self.n_marauders = 0
+        self.n_hellbats  = 0
+        self.n_banshees  = 0
+        self.commands = []
+
+        self.normalize = True
+        self.use_model_rewards = True
+
+        rand = random.uniform(0,4)
+        if rand <= 1:
+            self.n_marauders = round(random.uniform(1, 20))
+        elif rand <= 2:
+            self.n_hellbats  = round(random.uniform(2, 10))
+        elif rand <= 3:
+            self.n_banshees  = round(random.uniform(1, 10))
+        else:
+            self.n_marauders = round(random.uniform(1, 20))
+
+        self.n_zealots    = 0
+        self.n_stalkers   = 0
+        self.n_phoenixes  = 0
+        self.n_probes     = 0
+
+        self.unit_namespace = ["zealot", "stalker", "phoenix", "probe", "marauder", "hellbat", "banshee"]
+        self.current_observation = [0, 0, 0, 0, self.n_marauders, self.n_hellbats, self.n_banshees]
+
+
+        self.total_supply = self.n_marauders * 2 + self.n_hellbats * 2 + self.n_banshees * 3
+        print("Enemy supply: {}".format(self.total_supply))
+
+        self.model_input = None
+        self.init_model()
+
+        self.model = model.ArmyCompModel(self.model_input)
+        self.current_supply = 0
+        self.ready = False
+
+    def init_model(self):
+        self.model_input = []
+        if self.n_marauders != 0:
+            self.model_input.append([MARAUDER, self.n_marauders])
+        if self.n_hellbats != 0:
+            self.model_input.append([HELLIONTANK, self.n_hellbats])
+        if self.n_banshees != 0:
+            self.model_input.append([BANSHEE, self.n_banshees])
+
+
+    def disable_normalization(self):
+        self.normalize = False
+
+    def initialize_in_game_simulation_commands(self):
+        for u, n in zip(self.unit_namespace, self.current_observation):
+            self.commands.append("-{} {}".format(u, n))
+        print("Initialized commands: {}".format(self.commands))
+
+    def normalize_observation(self):
+        o = self.current_observation
+        total_ally_supply = o[0]*2 + o[1]*2 + o[2]*2 + o[3]
+        if total_ally_supply == 0:
+            total_ally_supply = 1
+        normalized_obs = []
+        normalized_obs.append(o[0]*2/total_ally_supply)
+        normalized_obs.append(o[1]*2/total_ally_supply)
+        normalized_obs.append(o[2]*2/total_ally_supply)
+        normalized_obs.append(o[3]/total_ally_supply)
+
+        normalized_obs.append(o[4]*2/self.total_supply)
+        normalized_obs.append(o[5]*2/self.total_supply)
+        normalized_obs.append(o[6]*3/self.total_supply)
+        print("Normalized observation: {}".format(normalized_obs))
+        return normalized_obs
+
+    def get_current_observation(self):
+        if self.normalize:
+            normalized = self.normalize_observation()
+            return np.array(normalized)
+        else:
+            return np.array(self.current_observation)
+
+    def get_raw_observation(self):
+        return self.current_observation
+
+    def add_unit(self, unit):
+        print("Action arrived: {}".format(unit))
+        reward = 0
+        if unit == 0:
+            self.n_zealots += 1
+            self.current_supply += 2
+            self.current_observation[0] += 1
+            reward = self.model.utility_of(ZEALOT) * 0.1
+        elif unit == 1:
+            self.n_stalkers += 1
+            self.current_supply += 2
+            self.current_observation[1] += 1
+            reward = self.model.utility_of(STALKER) * 0.1
+        elif unit == 2:
+            self.n_phoenixes += 1
+            self.current_supply += 2
+            self.current_observation[2] += 1
+            reward = self.model.utility_of(PHOENIX) * 0.1
+        elif unit == 3:
+            self.n_probes += 1
+            self.current_supply += 1
+            self.current_observation[3] += 1
+            reward = self.model.utility_of(PROBE) * 0.1
+        else:
+            print("####### NO ACTION CHOSE")
+        if self.current_supply >= self.total_supply:
+                self.initialize_in_game_simulation_commands()
+                self.ready = True
+
+        #observation_, reward, done, info
+        return self.get_current_observation(), reward, self.ready, ""
+
+    def on_end(self, result):
+        self.result = result
+
+
+    def simulate_exchange(self):
+        result = run_game(maps.get("TrainingEnvironment"),
+            [Bot(Race.Protoss, SimulatorAgent(self.current_observation, self.total_supply, self.commands, self.on_end)), Computer(Race.Terran, Difficulty.Easy)],
+            realtime=False)
+
+        return self.result
+
+
+class HardSimulation(Simulation):
+
+    def __init__(self, initial_namespace):
+        super(HardSimulation, self).__init__()
+
+        self.use_model_rewards = True
+        self.use_supply_in_obs = True
+
+         # generating army
+        self.commands  = []
+        self.normalize = True
+
+        rand = random.uniform(0,6)
+        self.army = None
+        if rand <= 1:
+            self.army = army_generator.small_random_army()
+            print(">>>> Small random army")
+        elif rand <= 2:
+            self.army = army_generator.medium_random_army()
+            print(">>>> Medium random army")
+        elif rand <= 3:
+            self.army = army_generator.big_random_army()
+            print(">>>> Big random army")
+        elif rand <=4:
+           self.army = army_generator.mech_army(random.choice([40, 45, 50, 55, 60, 65, 70]))
+           print(">>>> Mech army")
+        else:
+            self.army = army_generator.bio_army(random.randint(22,70))
+            print(">>>> Bio army")
+
+
+        self.n_of_ally_different_units = len(initial_namespace)
+        self.unit_namespace = list(initial_namespace)
+
+
+        # Order matters
+        self.e_unit_namespace = [k for k in terran_units if terran_units[k]["disabled"] == False]
+        self.unit_namespace += self.e_unit_namespace
+        print("Initialized name space: {}".format(self.unit_namespace))
+
+
+        self.current_observation = [0 for _ in self.unit_namespace]
+        self.init_observation()
+        print("Initial observation: {}".format(self.current_observation))
+
+        self.total_supply = sum(terran_units[unit[0]]["supply"]*unit[1] for unit in self.army)
+        print("Enemy supply: {}".format(self.total_supply))
+
+        self.model = model.ArmyCompModel(self.army)
+        self.current_supply = 0
+        self.ready = False
+
+    def init_observation(self):
+        for e in self.army:
+            for i, u_type in enumerate(self.e_unit_namespace):
+                if u_type == e[0]:
+                    index = i + self.n_of_ally_different_units
+                    assert self.current_observation[index] == 0
+                    self.current_observation[index] = e[1]
+
+
+    def disable_normalization(self):
+        self.normalize = False
+
+    def disable_model_rewards(self):
+        self.use_model_rewards = False
+
+    def disable_total_supply_obs(self):
+        self.use_supply_in_obs = False
+
+
+
+    def initialize_in_game_simulation_commands(self):
+        for u_type, amount in zip(self.unit_namespace, self.current_observation):
+            self.commands.append("-{} {}".format(all_units[u_type]["name"], amount))
+
+        print("Initialized commands: {}".format(self.commands))
+
+    def normalize_observation(self):
+        o = self.current_observation
+        total_ally_supply = sum([protoss_units[self.unit_namespace[i]]["supply"]*self.current_observation[i] for i in range(self.n_of_ally_different_units)])
+        if total_ally_supply == 0:
+            total_ally_supply = 1
+        normalized_obs = []
+        for i in range(self.n_of_ally_different_units):
+            unit_type = self.unit_namespace[i]
+            normalized_obs.append(o[i]*protoss_units[unit_type]["supply"]/total_ally_supply)
+        for i in range(self.n_of_ally_different_units, len(self.current_observation)):
+            unit_type = self.unit_namespace[i]
+            normalized_obs.append(o[i]*terran_units[unit_type]["supply"]/self.total_supply)
+
+        if self.use_supply_in_obs:
+            normalized_obs = [self.total_supply - self.current_supply] + normalized_obs
+        print("Normalized observation: {}".format(normalized_obs))
+        return normalized_obs
+
+
+    def get_current_observation(self):
+        if self.normalize:
+            normalized = self.normalize_observation()
+            return np.array(normalized)
+        else:
+            return np.array([self.total_supply - self.current_supply] + self.current_observation)
+
+    def get_raw_observation(self):
+        return self.current_observation
+
+    def add_unit(self, unit):
+        unit_type = self.unit_namespace[unit]
+        self.current_observation[unit] += 1
+        self.current_supply += protoss_units[unit_type]["supply"]
+
+        reward = 0
+        if self.use_model_rewards:
+            reward = self.model.utility_of(unit_type) * 10
+
+        if self.current_supply >= self.total_supply:
+            self.initialize_in_game_simulation_commands()
+            self.ready = True
+
+        #observation_, reward, done, info
+        return self.get_current_observation(), reward, self.ready, ""
+#=====
+#./neural_training/SimulatorAgent.py
+# 165 iterations per minute
+
+import sc2
+import random
+import time
+import numpy as np
+import math
+import matplotlib.pyplot as plt
+import threading
+from sc2 import run_game, maps, Race, Difficulty, position, Result
+from sc2.player import Bot, Computer
+from info import terran_units
+
+
+class SimulatorAgent(sc2.BotAI):
+
+
+    def __init__(self, observation, total_army_value, commands, submit_reward):
+        self.ITERATIONS_PER_MINUTE = 165
+        self.HEADLESS = False
+        self.terran_units_info = terran_units()
+
+        self.initial_supply = total_army_value
+        self.commands = commands
+
+        self.submit_reward = submit_reward
+
+
+        if not self.commands:
+            self.n_zealots   = observation[0]
+            self.n_stalkers  = observation[1]
+            self.n_immortals = observation[2]
+
+            self.n_marines = observation[3]
+            self.n_marauders = observation[4]
+            self.n_tanks = observation[5]
+            self.n_banshees = observation[6]
+
+
+    async def on_start_async(self):
+        if self.commands:
+            for command in self.commands:
+                await self.chat_send(command)
+        else:
+            await self.chat_send("let us begin!")
+            await self.chat_send("-marine {}".format(self.n_marines))
+            await self.chat_send("-marauder {}".format(self.n_marauders))
+            await self.chat_send("-stank {}".format(self.n_tanks))
+            await self.chat_send("-banshee {}".format(self.n_banshees))
+
+
+            await self.chat_send("-zealot {}".format(self.n_zealots))
+            await self.chat_send("-stalker {}".format(self.n_stalkers))
+            await self.chat_send("-immortal {}".format(self.n_immortals))
+        await self.chat_send("-begin")
+
+
+    async def on_step(self, iteration):
+        #self.compute_enemy_supply_belief()
+        pass
+
+    def normalize_supply_left(self, leftover):
+        return leftover/self.initial_supply
+
+    def compute_enemy_supply_belief(self):
+        enemy_leftover_supply = 0
+        for unit in self.known_enemy_units:
+            u_type = unit.type_id
+            enemy_leftover_supply += self.terran_units_info[u_type]["supply"]
+        return enemy_leftover_supply
+
+
+    def on_end(self, result):
+        print("Game ended")
+        print("Result: {}".format(result))
+        if result == Result.Victory:
+            # How much army do I have left
+            reward = 500 #* self.normalize_supply_left(self.supply_army)
+            self.submit_reward(reward)
+
+        else:
+            # How much army does enemy have left
+            enemy_supply = self.compute_enemy_supply_belief()
+            reward = (-500) #* self.normalize_supply_left(enemy_supply)
+            self.submit_reward(reward)
+#=====
+#./neural_training/test.py
+import tensorflow as tf
+from tensorflow import keras
+import sc2
+import random
+import time
+import numpy as np
+import math
+import matplotlib.pyplot as plt
+import threading
+import os
+from sc2 import run_game, maps, Race, Difficulty, position, Result
+from sc2.player import Bot, Computer
+from PolicyGradient_old import PolicyGradientAgent
+from Simulations import SimpleSimulation
+
+def get_user_inputs(checkpoints_dir):
+    simulation_location = input("Choose model location \n> ")
+    episodes = int(input("How many episodes? \n>"))
+    load_checkpoint = False
+    full_dir_location = os.path.join(os.path.abspath(os.getcwd()), checkpoints_dir, simulation_location)
+
+    return simulation_location, episodes
+
+def save_info(agent, win_loss, save_dir):
+    win_ratio = (win_loss[0]/(win_loss[0]+win_loss[1]))
+    with open(os.path.join(save_dir, "info"), "w+") as f:
+        f.write("{}\nWin ratio: {}".format(repr(agent), win_ratio))
+
+    graphname = os.path.join(save_dir, 'graph.png')
+    plotLearning(score_history, filename=graphname, window=25)
+
+if __name__ == "__main__":
+    checkpoints_dir = "checkpoints/"
+    simulation_location, num_episodes = get_user_inputs(checkpoints_dir)
+    simulation_dir = os.path.join(checkpoints_dir, simulation_location)
+
+
+
+    agent = PolicyGradientAgent(ALPHA=0.0005, input_dims=7, GAMMA=0.99,
+                                n_actions=4, layer1_size=49, layer2_size=49,
+                                chkpt_dir=simulation_dir)
+
+
+    agent.load_checkpoint()
+    print("Checkpoint successfully loaded")
+
+    score = 0
+    observations = []
+
+    for i in range(num_episodes):
+        print('episode: ', i,'score: ', score)
+        done = False
+        score = 0
+        simulation = SimpleSimulation()
+        simulation.disable_normalization()
+        observation = simulation.get_current_observation()
+        while not done:
+            action = agent.choose_action(observation)
+            print("Action chose: {}".format(action))
+            observation_, reward, done, info = simulation.add_unit(action)
+            agent.store_transition(observation, action, reward)
+            observation = observation_
+            score += reward
+
+        observations.append(simulation.commands)
+    for o in observations:
+        print(o)
+#=====
+#./neural_training/__init__.py
+#=====
+#./neural_training/__pycache__
+#=====
+#./neural_training/__pycache__/info.cpython-37.pyc
+#=====
+#./neural_training/__pycache__/NeuralNetworks.cpython-37.pyc
+#=====
+#./neural_training/__pycache__/PolicyGradient.cpython-37.pyc
+#=====
+#./neural_training/__pycache__/QLearningAgent.cpython-37.pyc
+#=====
+#./neural_training/__pycache__/Simulations.cpython-37.pyc
+#=====
+#./neural_training/__pycache__/SimulatorAgent.cpython-37.pyc
+#=====
+#./neural_training/__pycache__/__init__.cpython-37.pyc
+#=====
+#./sourcecode
+#=====
+#./test.py
+import tensorflow.compat.v1 as tf
+
+tensor = tf.constant([[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]])
+print(tensor)
+t2 = tensor * [1, 2, 3, 4]
+print(t2)#=====
+#./test.test
+#=====
+#./__init__.py
+#=====
+#./__pycache__
+#=====
+#./__pycache__/info.cpython-37.pyc
+#=====
+#./__pycache__/info.cpython-38.pyc
+#=====
+#./__pycache__/main.cpython-38.pyc
+#=====
+#./__pycache__/main_utils.cpython-37.pyc
+#=====
+#./__pycache__/__init__.cpython-37.pyc

@@ -8,14 +8,15 @@ from ..utils.function_utils import agent_method
 from ..utils.constants             import *
 from ..utils.units                 import getUnits      
 from ..utils.logic                 import getLogic
+from ..utils.map_area              import MapArea
+from ..utils.map_area              import compute_no_construction_areas
 
-from .planning.plan         import Plan
-from .planning.planner      import Planner
+from .LTM.memory            import Memory 
 from .visualizer            import Visualizer
-from .attack_engine         import Attacker
 from .scouting              import Scouter
+from .belief                import Belief
+from .ensamble              import GradientEnsamble
 
-from ..learning.cnn.training_data  import Trainer 
 
 class Intel:
 
@@ -32,21 +33,34 @@ class Intel:
             2: self.attack_mode
         }
 
-        self.plan = None
-        self.planner    = Planner()
-        self.trainer    = Trainer()
+        self.bad_locations = []
+
+        self.memory     = Memory()
         self.visualizer = Visualizer()
-        self.attacker   = Attacker(self.visualizer, self.trainer)
         self.scouter    = Scouter()
+        self.belief     = Belief() 
+        self.ensamble   = GradientEnsamble(["128_128_hard_no_air_6_highrewards"])
+
+        self.attacking = False
+        self.grouped   = False
+
 
     @agent_method
     async def act(self, iteration, agent=None):
+
+        self.visualizer.set_bad_areas(self.bad_locations)
         self.visualizer.draw_information()
         agent.iteration = iteration
         agent.current_minute = iteration / agent.ITERATIONS_PER_MINUTE      
+
+        await self.standard_mode()
         await self.modes[self.current_mode]()
-        await self.scout()
         self.current_mode = (self.current_mode + 1) % 3
+
+    async def standard_mode(self):
+        self.update_no_contruction_areas()
+        await self.scout()
+        await self.update_belief()
 
     async def economy_mode(self):
         await self.build_workers()
@@ -56,14 +70,25 @@ class Intel:
         await self.expand()   
         
     async def make_army_mode(self):
-        await self.advance_tech()
+        await self.build_gateways()
         await self.research_upgrades()
-        await self.build_army()
         await self.warp_army()    
 
     async def attack_mode(self):
-        await self.attacker.attack_with_model()
-        #await self.attack()    
+        await self.regroup_army()
+        await self.attack()  
+    
+
+    @agent_method
+    def update_no_contruction_areas(self, agent=None):
+        if len(agent.units(NEXUS)) > len(self.bad_locations):
+            self.bad_locations = compute_no_construction_areas()    
+
+
+    @agent_method
+    async def update_belief(self, agent=None):
+        if len(agent.known_enemy_units) > 0:
+            self.belief.update()
 
     @agent_method
     async def distribute_workers(self, agent=None):
@@ -86,11 +111,17 @@ class Intel:
             nexuses = agent.units(NEXUS).ready
             if nexuses.exists:
                 if agent.can_afford(PYLON):
-                    await agent.build(PYLON, near=nexuses.first, max_distance=500)
+                    location = None
+                    while True:
+                        location = random.choice(agent.units(NEXUS)).position.to2.random_on_distance(4)
+                        if not self.bad_locations[0].contains(location):
+                            break
+                    placement = await agent.find_placement(PYLON, location, placement_step=1)
+                    await agent.build(PYLON, near=placement, max_distance=1)
     
     @agent_method
     async def build_assimilators(self, agent=None):
-        if agent.supply_used < 14:
+        if agent.supply_workers < 14:
             return
         for nexus in agent.units(NEXUS).ready:
             vespenes = agent.state.vespene_geyser.closer_than(15.0, nexus)
@@ -116,10 +147,10 @@ class Intel:
             if can_build_function():
                 build = observer_info["buildFunction"]
                 await build()
-            elif self.planner.exists_plan_for(OBSERVER):
-                await self.planner.advance(OBSERVER)
+            elif self.memory.already_tried_to_achieve(OBSERVER):
+                await self.memory.advance(OBSERVER)
             else:
-                self.planner.generate_new_plan(OBSERVER)    
+                self.memory.record_attempt(OBSERVER)    
 
         # Scout the map
         await self.scouter.scout_map()
@@ -132,63 +163,59 @@ class Intel:
             await agent.expand_now()
 
     @agent_method
-    async def advance_tech(self, agent=None):
+    async def build_gateways(self, agent=None):
+        if len(agent.units(GATEWAY)) > 9:
+            return
         if agent.units(PYLON).ready.exists:
             pylon = agent.units(PYLON).ready.random
-            """if self.units(GATEWAY).ready.exists and not self.units(CYBERNETICSCORE).exists:
-                if self.can_afford(CYBERNETICSCORE) and not self.already_pending(CYBERNETICSCORE):
-                    await self.build(CYBERNETICSCORE, near=pylon)"""
             if len(agent.units(GATEWAY)) < agent.current_minute:
                 if agent.can_afford(GATEWAY) and not agent.already_pending(GATEWAY):
-                    await agent.build(GATEWAY, near=pylon)
-
-            """if self.units(CYBERNETICSCORE).ready.exists:
-                if self.current_minute > 3 and self.units(STARGATE).amount < 2:
-                    if self.can_afford(STARGATE) and not self.already_pending(STARGATE):
-                        await self.build(STARGATE, near=pylon)"""
+                    location = None
+                    while True:
+                        location = pylon.position.to2.random_on_distance(4)
+                        if not self.bad_locations[0].contains(location):
+                            break
+                    placement = await agent.find_placement(GATEWAY, location, placement_step=1)
+                    await agent.build(GATEWAY, near=placement, max_distance = 1)
 
     @agent_method
-    async def research_upgrades(self, agent=None):
-        
+    async def research_upgrades(self, agent=None):       
         if agent.units(CYBERNETICSCORE).ready.exists and agent.can_afford(RESEARCH_WARPGATE) and RESEARCH_WARPGATE not in self.performed_actions:
-            #print(dir(self.units(CYBERNETICSCORE)[0]))
             cybercore = agent.units(CYBERNETICSCORE).ready.first
             await agent.do(cybercore(RESEARCH_WARPGATE))        
-            self.performed_actions.add(RESEARCH_WARPGATE)        
-
-    
-    @agent_method
-    async def build_army(self, agent=None):
-        for gateway in agent.units(GATEWAY).ready.noqueue:
-            if not agent.units(STALKER).amount > agent.units(VOIDRAY).amount:
-                if agent.units(CYBERNETICSCORE).ready.exists and agent.can_afford(STALKER) and agent.supply_left > 2:
-                    if random.uniform(0, 1) > 0.8:
-                        await agent.do(gateway.train(SENTRY))
-                    else:
-                        await agent.do(gateway.train(STALKER))
-                
-        for stargate in agent.units(STARGATE).ready.noqueue:
-            if agent.can_afford(VOIDRAY) and agent.supply_left > 3:
-                await agent.do(stargate.train(VOIDRAY))
-
-        for rf in agent.units(ROBOTICSFACILITY).ready.noqueue:
-            if agent.can_afford(IMMORTAL) and agent.supply_left > 4:
-                await agent.do(rf.train(IMMORTAL))        
+            self.performed_actions.add(RESEARCH_WARPGATE)     
+        if agent.units(TWILIGHTCOUNCIL).ready.exists and agent.can_afford(RESEARCH_CHARGE)and RESEARCH_CHARGE not in self.performed_actions:
+            council = agent.units(TWILIGHTCOUNCIL).ready.first   
+            await agent.do(council(RESEARCH_CHARGE))
+            self.performed_actions.add(RESEARCH_CHARGE)   
 
     @agent_method
     async def warp_army(self, agent=None):
-        if agent.units(PYLON):
-            pylon = random.choice(agent.units(PYLON))
-        for warpgate in agent.units(WARPGATE).ready:
-            can_warp = await agent.get_available_abilities(warpgate)
-            if AbilityId.WARPGATETRAIN_STALKER in can_warp:
-                warp_location = pylon.position.to2.random_on_distance(4)
-                placement = await agent.find_placement(AbilityId.WARPGATETRAIN_STALKER, warp_location, placement_step=1)
-                if placement is None:
-                    print("could not warp")
-                    return
-                await agent.do(warpgate.warp_in(STALKER, placement))    
+        preferred_unit = self.ensamble.get_preferred_unit(self.belief.get_normalized_belief_as_array())   
+        print("Preferred unit: {}".format(preferred_unit))     
+        unit_info = self.units_info.get_protoss_units()[preferred_unit]
+        
+        can_build = unit_info["canBuildFunction"]
+        if can_build():
+            build_unit = unit_info["buildFunction"]
+            await build_unit()
+        else:
+            if self.memory.already_tried_to_achieve(preferred_unit):
+                await self.memory.advance(preferred_unit)
+            else:
+                self.memory.record_attempt(preferred_unit)
+                await self.memory.advance(preferred_unit)
 
+
+    @agent_method
+    async def regroup_army(self, agent=None):
+        if not self.grouped:
+            rally_location = self.scouter.variances.position_variance(agent.game_info.map_size, 
+                                                    random.choice(agent.units(NEXUS)).position)
+            for u_type in self.units_info.get_protoss_units():
+                for unit in agent.units(u_type).idle:
+                    await agent.do(unit.move(rally_location))
+            self.grouped = True        
 
     @agent_method
     def find_target(self, unit, agent=None):
@@ -200,39 +227,38 @@ class Intel:
             return agent.enemy_start_locations[0]
 
     @agent_method
-    async def full_attack(self, army, agent=None):
-        for UNIT_TYPE in army:
-            UNITS = agent.units(UNIT_TYPE)
-            for UNIT in UNITS.idle:
-                await agent.do(UNIT.attack(agent.find_target(UNIT)))
+    async def full_attack(self, agent=None):
+        for u_type in self.units_info.get_protoss_units():
+            if u_type == PROBE:
+                continue
+            units = agent.units(u_type)
+            for unit in units:
+                await agent.do(unit.attack(self.find_target(unit)))    
+
+    @agent_method
+    async def defend(self, agent=None):
+        if len(agent.known_enemy_units) > 0:
+            random_nexus = random.choice(agent.units(NEXUS))
+            target = agent.known_enemy_units.closest_to(random_nexus)
+            closest_nexus = agent.units(NEXUS).closest_to(target)
+            if target.distance_to(closest_nexus) < 20:
+                for u_type in self.units_info.get_protoss_units():
+                    if u_type == PROBE:
+                        continue
+                    for unit in agent.units(u_type).idle:
+                        await agent.do(unit.attack(target))
+                self.grouped = False        
 
     @agent_method
     async def attack(self, agent=None):
-        # {UNIT : [n to attack, n to defend]}
-        army = {STALKER : [15, 1],
-                VOIDRAY : [8, 1]}
+        if agent.supply_army < 10:
+            self.attacking = False
 
-        for UNIT in army:
-            if agent.units(UNIT).amount > army[UNIT][1]:
-                #defend
-                if len(agent.known_enemy_units) > 0:
-                    target = agent.known_enemy_units.closest_to(agent.units(UNIT)[0])
-                    #print(dir(target))
-                    if target.is_attacking:
-                        print("target is attacking")
-                        for s in agent.units(UNIT).idle:
-                            await agent.do(s.attack(target))
+        await self.defend()
+        
+        if agent.supply_army > 50 or self.attacking:
+            self.attacking = True
+            await self.full_attack()
 
-            elif agent.units(UNIT).amount > army[UNIT][0]:
-                #for s in self.units(UNIT).idle:
-                #    await self.do(s.attack(self.find_target(self.state)))
-                await self.full_attack(army)
-#        if self.units(STALKER).amount > 15:
-#            for s in self.units(STALKER).idle:
-#                await self.do(s.attack(self.find_target(self.state)))
-#        elif self.units(STALKER).amount > 3:
-#            if len(self.known_enemy_units) > 0:
-#                for s in self.units(STALKER).idle:
-#                    await self.do(s.attack(random.choice(self.known_enemy_units)))
 
     

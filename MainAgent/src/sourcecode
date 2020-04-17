@@ -1,0 +1,1651 @@
+#=====
+#.
+#=====
+#./intel
+#=====
+#./intel/belief.py
+
+from ..utils.constants import *
+from ..utils.function_utils import agent_method
+from TrainingEnvironment.info import terran_units
+
+import random
+
+class Belief:
+
+    def __init__(self):
+        self.enemy_total_supply = 0
+        self.enemy_army_comp = None
+        self.exclude = [SCV, MULE, RAVEN]
+        self.initialize_enemy_army_namespace()
+        
+        print("Initialized belief: {}".format(self.enemy_army_comp))
+
+    def initialize_enemy_army_namespace(self):
+        army_namespace = {}
+        all_units_info = terran_units()
+        for k in all_units_info:
+            unit_info = all_units_info[k]
+            if not unit_info["disabled"]:
+                army_namespace[k] = 0
+
+        self.enemy_army_comp = army_namespace        
+
+
+    @agent_method
+    def update(self, agent=None):
+        structures = agent.known_enemy_structures
+        
+        units = list(filter(lambda unit: unit.type_id not in self.exclude, agent.known_enemy_units - structures))
+
+        if len(units) > 0:
+            for u in units:
+                typ = u.type_id
+                if typ in self.enemy_army_comp:
+                    self.enemy_army_comp[typ] += 1
+
+
+
+    def get_normalized_belief(self):
+        normalized_bel = self.enemy_army_comp.copy()
+        total = sum(normalized_bel[k] for k in normalized_bel)
+        if total == 0:
+            total = 1
+        for k in normalized_bel:
+            normalized_bel[k] = normalized_bel[k]/total
+
+        return normalized_bel
+
+    def get_normalized_belief_as_array(self):
+        normalized_bel = self.get_normalized_belief()
+        return [normalized_bel[k] for k in normalized_bel]      
+
+#=====
+#./intel/ensamble.py
+from TrainingEnvironment.info import deserialize_namespace
+from TrainingEnvironment.main_utils import load_policy_gradient
+
+from ..utils.function_utils import agent_method
+
+import numpy as np
+
+
+class GradientEnsamble:
+
+    def __init__(self, gradient_names):
+
+        self.gradients = []
+        for name in gradient_names:
+            # load gradient
+            self.gradients.append(load_policy_gradient(name, "TrainingEnvironment/"))
+
+        print("Initialized gradients: {}".format(gradient_names))    
+
+
+    @agent_method
+    def get_preferred_unit(self, enemy_observation, agent=None):
+        for gradient in self.gradients:
+            action_space = deserialize_namespace(gradient.action_namespace)
+            amounts = []
+            for unit_id in action_space:
+                amount = len(agent.units(unit_id))
+                amounts.append(amount)
+
+            total = sum(amounts)
+            if total == 0:
+                total = 1
+                
+            observation = [a/total for a in amounts]
+            observation += enemy_observation
+            observation = np.array(observation)
+
+            action = gradient.choose_action(observation)
+            choosen_unit = action_space[action]
+            return choosen_unit
+
+
+
+
+#=====
+#./intel/LTM
+#=====
+#./intel/LTM/goal.py
+from ...utils.units import getUnits
+from ...utils.function_utils import agent_method
+
+class Goal:
+
+    
+    def __init__(self, goal):
+        """
+        Assumes goal to be a unit
+        """
+        self.units = getUnits()
+        self.plan  = []
+        self.ready_to_proceed = True
+
+        print("Initialize plan for: {}".format(goal))
+        self.initializePlan(goal)
+
+    def __len__(self):
+        return len(self.plan)
+
+    def initializePlan(self, goal):
+        print("Initializing plan for: {}".format(goal))
+        current_sub_goal = goal
+        while True:
+            required = self.units.protossUnits[current_sub_goal]["required"]
+            print("Required: {}".format(required))
+            can_build = self.units.protossUnits[required]["canBuildFunction"]()
+            self.plan.append(required)
+            current_sub_goal = required
+            if can_build:
+                break
+
+    def unlock(self):
+        self.ready_to_proceed = True
+
+    @agent_method
+    async def execute_next_step(self, agent=None):
+        if not self.ready_to_proceed:
+            return
+        next_goal = self.plan[-1]
+        if agent.units(next_goal).ready.exists:
+            self.plan.pop()
+            return
+
+        print("Next goal: {}".format(next_goal))
+        build  = self.units.protossUnits[next_goal]["buildFunction"]
+        success = await build(next_goal, self.unlock)
+ 
+        if success == True:
+            self.ready_to_proceed = False
+            self.plan.pop()    
+
+        else:
+            print("-------------- EXECUTE GOAL STEP FAILED ---------------")
+
+
+
+
+    def isFulfilled(self):
+        return self.__len__() == 0
+#=====
+#./intel/LTM/memory.py
+from .goal import Goal
+from ...utils.function_utils import agent_method
+
+class Memory:
+
+    def __init__(self):
+        self.current_goals = {}
+
+    
+    def already_tried_to_achieve(self, goal):
+        return goal in self.current_goals
+
+    @agent_method
+    def record_attempt(self, goal, agent=None):
+        self.current_goals[goal] = Goal(goal)
+
+    async def advance(self, goal):
+        try:
+            await self.current_goals[goal].execute_next_step()
+        except KeyError:
+            raise Exception("Cannot work towards: {}".format(goal))    
+
+#=====
+#./intel/LTM/__init__.py
+#=====
+#./intel/LTM/__pycache__
+#=====
+#./intel/LTM/__pycache__/goal.cpython-37.pyc
+#=====
+#./intel/LTM/__pycache__/memory.cpython-37.pyc
+#=====
+#./intel/LTM/__pycache__/plan.cpython-37.pyc
+#=====
+#./intel/LTM/__pycache__/plan.cpython-38.pyc
+#=====
+#./intel/LTM/__pycache__/planner.cpython-37.pyc
+#=====
+#./intel/LTM/__pycache__/planner.cpython-38.pyc
+#=====
+#./intel/LTM/__pycache__/__init__.cpython-37.pyc
+#=====
+#./intel/LTM/__pycache__/__init__.cpython-38.pyc
+#=====
+#./intel/main_intel.py
+import random
+import numpy as np
+
+from ..utils.units import getUnits
+from ..utils.constants import *
+from ..utils.function_utils import agent_method
+          
+from ..utils.constants             import *
+from ..utils.units                 import getUnits      
+from ..utils.logic                 import getLogic
+from ..utils.map_area              import MapArea
+from ..utils.map_area              import compute_no_construction_areas
+
+from .LTM.memory            import Memory 
+from .visualizer            import Visualizer
+from .scouting              import Scouter
+from .belief                import Belief
+from .ensamble              import GradientEnsamble
+
+
+class Intel:
+
+    def __init__(self, agent):
+        self.agent = agent
+        self.units_info = getUnits()
+        
+
+        self.current_mode = 0
+        self.performed_actions = set()
+        self.modes = {
+            0: self.economy_mode,
+            1: self.make_army_mode,
+            2: self.attack_mode
+        }
+
+        self.bad_locations = []
+
+        self.memory     = Memory()
+        self.visualizer = Visualizer()
+        self.scouter    = Scouter()
+        self.belief     = Belief() #"128_128_hard_no_air_4", 49x49_simple"
+        self.ensamble   = GradientEnsamble(["128_128_hard_no_air_6_highrewards"])
+
+        self.attacking = False
+        self.grouped   = False
+
+
+    @agent_method
+    async def act(self, iteration, agent=None):
+
+        self.visualizer.set_bad_areas(self.bad_locations)
+        self.visualizer.draw_information()
+        agent.iteration = iteration
+        agent.current_minute = iteration / agent.ITERATIONS_PER_MINUTE      
+
+        await self.standard_mode()
+        await self.modes[self.current_mode]()
+        self.current_mode = (self.current_mode + 1) % 3
+
+    async def standard_mode(self):
+        self.update_no_contruction_areas()
+        await self.scout()
+        await self.update_belief()
+
+    async def economy_mode(self):
+        await self.build_workers()
+        await self.distribute_workers()
+        await self.build_pylons()
+        await self.build_assimilators()
+        await self.expand()   
+        
+    async def make_army_mode(self):
+        await self.advance_tech()
+        await self.research_upgrades()
+        await self.build_army()
+        await self.warp_army()    
+
+    async def attack_mode(self):
+        await self.regroup_army()
+        await self.attack()  
+    
+
+    @agent_method
+    def update_no_contruction_areas(self, agent=None):
+        if len(agent.units(NEXUS)) > len(self.bad_locations):
+            self.bad_locations = compute_no_construction_areas()    
+
+
+    @agent_method
+    async def update_belief(self, agent=None):
+        if len(agent.known_enemy_units) > 0:
+            self.belief.update()
+
+    @agent_method
+    async def distribute_workers(self, agent=None):
+        try:
+            await agent.distribute_workers()
+        except ValueError:
+            print("Value error in distribute_workers()")
+
+    @agent_method
+    async def build_workers(self, agent=None):
+        if agent.units(PROBE).amount < agent.MAX_WORKERS:
+            for nexus in agent.units(NEXUS).ready.noqueue:
+                if agent.can_afford(PROBE) and agent.state.units(PROBE).closer_than(5.0, nexus).amount < 16:
+                    await agent.do(nexus.train(PROBE))
+
+    @agent_method
+    async def build_pylons(self, agent=None):
+        if ((not agent.units(PYLON).ready.exists and not agent.already_pending(PYLON)) or
+            (agent.supply_left < 5 and not agent.already_pending(PYLON))):
+            nexuses = agent.units(NEXUS).ready
+            if nexuses.exists:
+                if agent.can_afford(PYLON):
+                    location = None
+                    while True:
+                        location = random.choice(agent.units(NEXUS)).position.to2.random_on_distance(4)
+                        if not self.bad_locations[0].contains(location):
+                            break
+                    placement = await agent.find_placement(PYLON, location, placement_step=1)
+                    await agent.build(PYLON, near=placement, max_distance=1)
+    
+    @agent_method
+    async def build_assimilators(self, agent=None):
+        if agent.supply_workers < 14:
+            return
+        for nexus in agent.units(NEXUS).ready:
+            vespenes = agent.state.vespene_geyser.closer_than(15.0, nexus)
+            for vespene in vespenes:
+                if not agent.can_afford(ASSIMILATOR):
+                    break
+                if not agent.units(ASSIMILATOR).closer_than(1.0, vespene).exists:
+                    worker = agent.select_build_worker(vespene.position)
+                    if not worker:
+                        break
+                    await agent.do(worker.build(ASSIMILATOR, vespene))
+
+    @agent_method                
+    async def scout(self, agent=None):
+        # Try to scout the enemy base for information
+        if len(agent.units(OBSERVER)) > 0:
+            observer = agent.units(OBSERVER)[0]
+            await self.scouter.scout_enemy_base(observer)
+        else:
+            # An observer is needed
+            observer_info = self.units_info.protossUnits[OBSERVER]
+            can_build_function = observer_info["canBuildFunction"]
+            if can_build_function():
+                build = observer_info["buildFunction"]
+                await build()
+            elif self.memory.already_tried_to_achieve(OBSERVER):
+                await self.memory.advance(OBSERVER)
+            else:
+                self.memory.record_attempt(OBSERVER)    
+
+        # Scout the map
+        await self.scouter.scout_map()
+
+
+        
+    @agent_method
+    async def expand(self, agent=None):
+        if agent.units(NEXUS).amount < 3 and agent.can_afford(NEXUS):
+            await agent.expand_now()
+
+    @agent_method
+    async def advance_tech(self, agent=None):
+        if agent.units(PYLON).ready.exists:
+            pylon = agent.units(PYLON).ready.random
+            if len(agent.units(GATEWAY)) < agent.current_minute:
+                if agent.can_afford(GATEWAY) and not agent.already_pending(GATEWAY):
+                    location = None
+                    while True:
+                        location = pylon.position.to2.random_on_distance(4)
+                        if not self.bad_locations[0].contains(location):
+                            break
+                    placement = await agent.find_placement(GATEWAY, location, placement_step=1)
+                    await agent.build(GATEWAY, near=placement, max_distance = 1)
+
+    @agent_method
+    async def research_upgrades(self, agent=None):
+        
+        if agent.units(CYBERNETICSCORE).ready.exists and agent.can_afford(RESEARCH_WARPGATE) and RESEARCH_WARPGATE not in self.performed_actions:
+            cybercore = agent.units(CYBERNETICSCORE).ready.first
+            await agent.do(cybercore(RESEARCH_WARPGATE))        
+            self.performed_actions.add(RESEARCH_WARPGATE)     
+        if agent.units(TWILIGHTCOUNCIL).ready.exists and agent.can_afford(RESEARCH_CHARGE)and RESEARCH_CHARGE not in self.performed_actions:
+            council = agent.units(TWILIGHTCOUNCIL).ready.first   
+            await agent.do(council(RESEARCH_CHARGE))
+            self.performed_actions.add(RESEARCH_CHARGE)   
+
+    
+    @agent_method
+    async def build_army(self, agent=None):
+        for gateway in agent.units(GATEWAY).ready.noqueue:
+            if not agent.units(STALKER).amount > agent.units(VOIDRAY).amount:
+                if agent.units(CYBERNETICSCORE).ready.exists and agent.can_afford(STALKER) and agent.supply_left > 2:
+                    if random.uniform(0, 1) > 0.8:
+                        await agent.do(gateway.train(SENTRY))
+                    else:
+                        await agent.do(gateway.train(STALKER))
+                
+        for stargate in agent.units(STARGATE).ready.noqueue:
+            if agent.can_afford(VOIDRAY) and agent.supply_left > 3:
+                await agent.do(stargate.train(VOIDRAY))
+
+        for rf in agent.units(ROBOTICSFACILITY).ready.noqueue:
+            if agent.can_afford(IMMORTAL) and agent.supply_left > 4:
+                await agent.do(rf.train(IMMORTAL))        
+
+    @agent_method
+    async def warp_army(self, agent=None):
+        preferred_unit = self.ensamble.get_preferred_unit(self.belief.get_normalized_belief_as_array())   
+        print("Preferred unit: {}".format(preferred_unit))     
+        unit_info = self.units_info.get_protoss_units()[preferred_unit]
+        
+        can_build = unit_info["canBuildFunction"]
+        if can_build():
+            build_unit = unit_info["buildFunction"]
+            await build_unit()
+        else:
+            # TODO 
+            pass
+
+
+    @agent_method
+    async def regroup_army(self, agent=None):
+        if not self.grouped:
+            rally_location = self.scouter.variances.position_variance(agent.game_info.map_size, 
+                                                    random.choice(agent.units(NEXUS)).position)
+            for u_type in self.units_info.get_protoss_units():
+                for unit in agent.units(u_type).idle:
+                    await agent.do(unit.move(rally_location))
+            self.grouped = True        
+
+    @agent_method
+    def find_target(self, unit, agent=None):
+        if len(agent.known_enemy_units) > 0:
+            return agent.known_enemy_units.closest_to(unit)
+        elif len(agent.known_enemy_structures) > 0:
+            return random.choice(agent.known_enemy_structures)
+        else:
+            return agent.enemy_start_locations[0]
+
+    @agent_method
+    async def full_attack(self, agent=None):
+        for u_type in self.units_info.get_protoss_units():
+            units = agent.units(u_type)
+            for unit in units.idle:
+                await agent.do(unit.attack(self.find_target(unit)))
+
+    @agent_method
+    async def attack(self, agent=None):
+        # {UNIT : [n to attack, n to defend]}
+
+        if agent.supply_army < 10:
+            self.attacking = False
+
+        army = {STALKER : [15, 1],
+                ZEALOT  : [10, 1],
+                ADEPT   : [10, 1],
+                IMMORTAL: [2,  1],
+                VOIDRAY : [8, 1]}
+
+        for UNIT in army:
+            if agent.units(UNIT).amount > army[UNIT][1]:
+                #defend
+                if len(agent.known_enemy_units) > 0:
+                    target = agent.known_enemy_units.closest_to(agent.units(UNIT)[0])
+                    closest_nexus = agent.units(NEXUS).closest_to(target)
+                    if target.distance_to(closest_nexus) < 20:
+                        self.grouped = False
+                        for s in agent.units(UNIT).idle:
+                            await agent.do(s.attack(target))
+
+            elif agent.supply_army > 50 or self.attacking:
+                self.attacking = True
+                await self.full_attack()
+
+
+    #=====
+#./intel/scouting.py
+import random
+import numpy as np
+
+from sc2 import position
+
+from ..utils.constants      import *
+from ..utils.units          import getUnits
+from ..utils.function_utils import agent_method
+
+
+class Scouter:
+
+
+    def __init__(self):
+        self.variances      = PositionVariances()    
+        self.map_scout      = None
+        self.next_scout_iteration = 0
+
+    @agent_method
+    def choose_map_scout(self, agent=None):
+        if self.map_scout is None:
+            if agent.units(STALKER).exists:
+                stalker = random.choice(agent.units(STALKER))
+                self.map_scout = stalker
+            else:
+                self.map_scout = random.choice(agent.units(PROBE))
+        elif self.map_scout == PROBE:
+            if agent.units(STALKER).exists:
+                stalker = random.choice(agent.units(STALKER))
+                self.map_scout = stalker
+            else:
+                return
+        return None            
+
+    @agent_method
+    def update_next_iteration(self, agent=None):
+        delay = random.randrange(20, 165)
+        self.next_scout_iteration = agent.iteration + delay
+
+    @agent_method
+    async def scout_enemy_base(self, unit, agent=None):
+        enemy_location = agent.enemy_start_locations[0]
+        position = self.variances.random_enemy_start_location_variance(agent.game_info.map_size, enemy_location)
+        await agent.do(unit.move(position))
+
+    @agent_method
+    async def scout_map(self, agent=None):
+        if agent.iteration > self.next_scout_iteration:
+            self.choose_map_scout()
+            if self.map_scout is not None:
+                print("redirecting scout")    
+                position = self.variances.random_position_in_map(agent.game_info.map_size)
+                self.update_next_iteration()
+                await agent.do(self.map_scout.move(position))
+
+
+class PositionVariances:
+
+    def position_of(self, x, y):
+        return position.Point2(position.Pointlike((x, y)))
+
+    def random_enemy_start_location_variance(self, map_size, enemy_start_location):
+        return self.position_variance(map_size, enemy_start_location) 
+
+    def position_variance(self, map_size, position):
+        x = position[0]
+        y = position[1]
+
+        x += ((random.randrange(-20, 20))/100) * position[0]
+        y += ((random.randrange(-20, 20))/100) * position[1]
+
+        if x < 0:
+            x = 0
+        if y < 0:
+            y = 0
+        if x > map_size[0]:
+            x = map_size[0]
+        if y > map_size[1]:
+            y = map_size[1]
+
+        target = self.position_of(x, y)
+        return target       
+
+    def random_position_in_map(self, map_size):
+        x = random.randrange(map_size[0])
+        y = random.randrange(map_size[1])
+        
+        return self.position_of(x, y)
+#=====
+#./intel/visualizer.py
+import numpy as np
+import cv2
+from ..utils.constants      import *
+from ..utils.units          import getUnits
+from ..utils.function_utils import agent_method
+
+
+class Visualizer:
+
+
+    def __init__(self):
+        self.GREEN           = (0, 255, 0)
+        self.units_info      = getUnits()
+        self.visual_data     = None
+        self.military_weight = 0
+        self.bad_areas       = []
+
+    @agent_method
+    def compute_military_weight(self, agent=None):
+        total_weight = 0
+        #print(dir(self.agent.units))
+        for UNIT in self.units_info.protossUnits:
+            u_info = self.units_info.protossUnits[UNIT]
+            if UNIT == PROBE or u_info["type"] == "structure":
+                # ignore probes and structures
+                continue
+            amount = len(agent.units(UNIT))
+            weight = u_info["supply"]
+            total_weight += weight*amount
+        return total_weight    
+
+    @agent_method
+    def draw_mineral_fields(self, agent=None):    
+        for field in agent.state.mineral_field:
+            pos = field.position
+            cv2.circle(self.game_data, (int(pos[0]), int(pos[1])), 1, (255, 255,65 ), -1)
+
+    @agent_method
+    def draw_resources(self, agent=None):
+
+        line_max = 50
+        mineral_ratio = agent.minerals / 2500
+        if mineral_ratio > 1.0:
+            mineral_ratio = 1.0
+
+
+        vespene_ratio = agent.vespene / 2500
+        if vespene_ratio > 1.0:
+            vespene_ratio = 1.0
+
+        population_ratio = agent.supply_left / agent.supply_cap
+        if population_ratio > 1.0:
+            population_ratio = 1.0
+
+        plausible_supply = agent.supply_cap / 200.0
+
+        military_weight = self.compute_military_weight() / (agent.supply_cap-agent.supply_left)
+        self.military_weight = military_weight
+        if military_weight > 1.0:
+            military_weight = 1.0
+
+
+        cv2.line(self.game_data, (0, 19), (int(line_max*military_weight), 19),  (250, 250, 200), 3)  # army/supply ratio ?????????
+        cv2.line(self.game_data, (0, 15), (int(line_max*plausible_supply), 15), (220, 200, 200), 3)  # plausible supply (supply/200.0)
+        cv2.line(self.game_data, (0, 11), (int(line_max*population_ratio), 11), (150, 150, 150), 3)  # population ratio (supply_left/supply)
+        cv2.line(self.game_data, (0, 7),  (int(line_max*mineral_ratio), 7),     (210, 200, 0), 3)         # gas / 2500
+        cv2.line(self.game_data, (0, 3),  (int(line_max*vespene_ratio), 3),     (0, 255, 25), 3)          # minerals (minerals/2500)    
+
+    @agent_method
+    def draw_information(self, agent=None):
+        map_size = agent.game_info.map_size
+        self.game_data = np.zeros((map_size[1], map_size[0], 3), np.uint8)
+
+        
+
+        for unit_type in self.units_info.protoss_drawing_order:
+            visualization = self.units_info.protossUnits[unit_type]["visualization"]
+            color = visualization["color"]
+            size  = visualization["size"]
+            for unit in agent.units(unit_type).ready:
+                pos = unit.position
+                cv2.circle(self.game_data, (int(pos[0]), int(pos[1])), size, color, -1)
+
+        
+
+        main_base_names = ["nexus", "commandcenter", "hatchery"]
+        for enemy_building in agent.known_enemy_structures:
+            pos = enemy_building.position
+            if enemy_building.name.lower() not in main_base_names:
+                cv2.circle(self.game_data, (int(pos[0]), int(pos[1])), 5, (200, 50, 212), -1)
+        for enemy_building in agent.known_enemy_structures:
+            pos = enemy_building.position
+            if enemy_building.name.lower() in main_base_names:
+                cv2.circle(self.game_data, (int(pos[0]), int(pos[1])), 15, (0, 0, 255), -1)
+
+        for enemy_unit in agent.known_enemy_units:
+            if enemy_unit.is_structure:
+                continue
+            unit_type = enemy_unit.type_id
+            if unit_type in self.units_info.terran_units:
+                pos = enemy_unit.position
+                visualization = self.units_info.terran_units[unit_type]["visualization"]
+                color = visualization["color"]
+                size  = visualization["size"]
+                cv2.circle(self.game_data, (int(pos[0]), int(pos[1])), size, color, -1)
+
+        self.draw_mineral_fields()    
+        self.draw_bad_areas()
+
+        # flip horizontally to make our final fix in visual representation:
+        self.visual_data = cv2.flip(self.game_data, 0)
+
+        if not agent.HEADLESS:
+            resized = cv2.resize(self.visual_data, dsize=None, fx=2, fy=2)
+
+            cv2.imshow('Visual Data', resized)
+            cv2.waitKey(1)
+
+    def draw_bad_areas(self):
+        for area in self.bad_areas:
+            for pos in area:
+                cv2.circle(self.game_data, (int(pos[0]), int(pos[1])), 2, (255, 0, 0), -1)       
+
+
+    def set_bad_areas(self, bad_areas):
+        self.bad_areas = bad_areas
+
+    @agent_method
+    def print_info_to_console(self, agent=None):
+        pass
+
+
+
+#if __name__ == "__main__":
+    #v = Visualizer(None)        #=====
+#./intel/__init__.py
+# Package Init file#=====
+#./intel/__pycache__
+#=====
+#./intel/__pycache__/attack_engine.cpython-37.pyc
+#=====
+#./intel/__pycache__/attack_engine.cpython-38.pyc
+#=====
+#./intel/__pycache__/belief.cpython-37.pyc
+#=====
+#./intel/__pycache__/ensamble.cpython-37.pyc
+#=====
+#./intel/__pycache__/imports.cpython-38.pyc
+#=====
+#./intel/__pycache__/main_intel.cpython-37.pyc
+#=====
+#./intel/__pycache__/main_intel.cpython-38.pyc
+#=====
+#./intel/__pycache__/scouting.cpython-37.pyc
+#=====
+#./intel/__pycache__/scouting.cpython-38.pyc
+#=====
+#./intel/__pycache__/visualizer.cpython-37.pyc
+#=====
+#./intel/__pycache__/visualizer.cpython-38.pyc
+#=====
+#./intel/__pycache__/__init__.cpython-37.pyc
+#=====
+#./intel/__pycache__/__init__.cpython-38.pyc
+#=====
+#./sourcecode
+#=====
+#./utils
+#=====
+#./utils/constants.md
+#=====
+#./utils/constants.py
+"""
+Main constants to be imported.
+e.g. import constants
+"""
+# UNITS
+from sc2.constants import PROBE, ZEALOT, SENTRY, STALKER, ADEPT, HIGHTEMPLAR, DARKTEMPLAR, ARCHON, OBSERVER, WARPPRISM, IMMORTAL, \
+                        COLOSSUS, DISRUPTOR, PHOENIX, VOIDRAY, ORACLE, TEMPEST, CARRIER, MOTHERSHIP
+
+# PROTOSS STRUCTURES
+from sc2.constants import NEXUS, PYLON, ASSIMILATOR, GATEWAY, FORGE, CYBERNETICSCORE, SHIELDBATTERY, TWILIGHTCOUNCIL, ROBOTICSFACILITY, \
+                    STARGATE, TEMPLARARCHIVE, ROBOTICSBAY, DARKSHRINE, PHOTONCANNON, FLEETBEACON, WARPGATE                        
+
+# TERRAN UNITS
+from sc2.constants import SCV, MULE, MARINE, MARAUDER, REAPER, GHOST, HELLION, HELLIONTANK, WIDOWMINE, SIEGETANK, \
+                        CYCLONE, THOR, THORAP, VIKING, VIKINGFIGHTER, MEDIVAC, LIBERATOR, \
+                        BANSHEE, RAVEN, BATTLECRUISER
+
+# PROTOSS RESEARCH UPGRADES
+from sc2.constants import RESEARCH_WARPGATE, AbilityId                       #=====
+#./utils/function_utils.py
+
+__agent = None
+def initialize_function_utils(agent):
+    """
+    This method is used to initialize the main agent 
+    class in this file. This is done to allow the injection
+    of the MainAgent(sc2.BotAI) to every decorated method (see agent_method)
+
+    The injected object lives in the __agent variable in this file.
+    """
+    global __agent 
+    __agent = agent
+
+
+def agent_method(function):
+    """
+    Decorator function:
+    Every method decorated with @agent_method will have
+    the main agent class (which inherits sc2.BotAI class) injected.
+
+    Example usage:
+    @agent_method
+    def test_method(*args, agent=None, **kwargs):
+        ...
+
+    """
+    def wrapper(*args, **kwargs):
+        global __agent
+        rv = function(*args, __agent, **kwargs)
+        return rv
+    return wrapper    
+    #=====
+#./utils/initializer.py
+from .units import initialize_units
+from .units import initialize_units_agent
+from .logic import getLogic
+
+def init_logic_modules(agent):
+    """
+    Executed at startup.
+    Manually intializes key objects to avoid loops during import.
+    """
+    initialize_units(getLogic(agent)) # magic lines
+    initialize_units_agent(agent)
+#=====
+#./utils/logic.py
+import random
+from .constants import *
+from .notifier import Notifier
+from .function_utils import agent_method
+
+class Logic:
+    """
+    The main logic resides in this class.
+    All default functions to produce units and structures resides in this class.
+    """
+    def __init__(self, agent):
+        from .units import getUnits
+        self.agent = agent
+        self.units = getUnits()
+
+ 
+    async def build_structure(self, structure, postAction=None, pylon=None):
+        """
+        Main function to build a structure.
+        If a post action is specified, it will be executed when the structure is 
+        finished building.
+
+        Inputs:
+           structure:  the id of the structure to be built
+           postaction: action to be done after the structure is finished building (can be None)
+           pylon: pylon to build the new structure (can be None) 
+        """
+
+        agent = self.agent
+        
+        if agent.units(PYLON).ready.exists:
+            if not pylon:
+                pylon = agent.units(PYLON).ready.random    
+            if agent.can_afford(structure):
+                await agent.build(structure, near=pylon)
+                if postAction:
+                    condition = lambda: agent.units(structure).ready.exists
+                    notifier = Notifier(condition, postAction)
+                    notifier.start()
+                return True
+        return False        
+
+    @agent_method
+    def choose_structure_to_train(self, structure_type, agent=None):
+        """
+        Returns a random idle structure of the specified type.
+        If there are no idle structures of the specified type, it returns None.
+        """
+        available_structures = agent.units(structure_type).ready.idle
+        if not available_structures:
+            return None
+        else:
+            return random.choice(available_structures)    
+
+    @agent_method
+    async def build_unit(self, unit, agent=None):
+        """
+        Main function to train a unit.
+        Returns True if the train command was executed, false otherwise.
+
+        The train command will not be executed if (or):
+            - there is no available structure to train the selected unit
+            - the agent cannot afford the selected unit
+            - the agent does not have enough supply for the selected unit
+        """
+        supply_needed = self.units.protossUnits[unit]["supply"]
+        target_structure = self.choose_structure_to_train(self.units.protossUnits[unit]["builtIn"])
+        if target_structure:
+            if (agent.can_afford(unit) and agent.supply_left >= supply_needed):
+                await agent.do(target_structure.train(unit))
+                return True
+        return False
+
+    @agent_method
+    async def warp_unit(self, unit, agent=None):
+        """
+        Main function to warp a unit.
+        Warping a unit is equivalent of training a unit. The warped unit will be spawned 
+        near a chosen pylon instead of spawning near the structure that trained it.
+
+        This method warps the selected units near a random pylon.
+        """
+        if agent.units(PYLON):
+            pylon = random.choice(agent.units(PYLON))
+            for warpgate in agent.units(WARPGATE).ready:
+                can_warp = await agent.get_available_abilities(warpgate)
+                warp_ability = self.units.protossUnits[unit]["warpAbilityId"]
+                if warp_ability in can_warp:
+                    warp_location = pylon.position.to2.random_on_distance(4)
+                    placement = await agent.find_placement(warp_ability, warp_location, placement_step=1)
+                    if placement is None:
+                        print("could not warp")
+                        return
+                    await agent.do(warpgate.warp_in(unit, placement)) 
+
+    @agent_method
+    async def build_gateway_unit(self, unit, agent=None):
+        """
+        Since gateway units can be both trained or warped, 
+        this method warps the selected unit if possible, otherwise
+        it trains it.
+        """ 
+        if len(agent.units(WARPGATE).ready) != 0:
+            # warpgate was researched hence the unit must be warped
+            await self.warp_unit(unit)
+              
+        if len(agent.units(GATEWAY).ready.noqueue) != 0:
+            await self.build_unit(unit)
+
+
+    def can_build_archon(self):
+        # TODO obvs
+        return False     
+
+
+
+    def can_build(self, unit):
+        """
+        Returns True if the input unit can be built.
+        A specified unit can be build if:
+            - the agent has the required structure, and
+            - the agent has the tech required to build the unit
+        """
+        structure_required = self.units.protossUnits[unit]["builtIn"]
+        tech_required = self.units.protossUnits[unit]["required"]
+        if tech_required:
+            return self.agent.units(structure_required).ready.exists and self.agent.units(tech_required).ready.exists
+        else:
+            return self.agent.units(structure_required).ready.exists  
+
+logic = None
+def getLogic(agent):
+    """
+    Singleton pattern, returns the logic singleton object
+    """
+    global logic
+    if not logic:
+        logic = Logic(agent)
+    return logic         #=====
+#./utils/map_area.py
+from .constants import *
+from .function_utils import agent_method
+
+class MapArea:
+
+    """
+    This object represent a square portion of the map.
+    """
+    def __init__(self, min_x, min_y, max_x, max_y):
+        self.min_x = min_x
+        self.min_y = min_y
+        self.max_x = max_x
+        self.max_y = max_y
+        self.locations = self._compute_locations()
+
+    def __repr__(self):
+        return "x: {}-{}, y: {}-{}".format(self.min_x, self.max_x, self.min_y, self.max_y)
+
+    def __iter__(self):
+        """
+        Iterates through all the points in the area.
+        The points are stored in the self.locations list object
+        """
+        for l in self.locations:
+            yield l    
+
+    def _compute_locations(self):
+        """
+        Computes all the points in the area.
+        Executed after __init__
+        """
+        locations = []
+        for x in range(int(self.min_x), int(self.max_x)):
+            for y in range(int(self.min_y), int(self.max_y)):
+                locations.append([x, y])
+        return locations        
+
+    def contains(self, position):
+        """
+        Returns True if the MapArea contains the input position.
+        Position = (x, y)
+        """
+        x = position[0]
+        y = position[1]
+
+        return (x >= self.min_x and x <= self.max_x and \
+                y >= self.min_y and y <= self.max_y)
+
+
+@agent_method
+def compute_no_construction_areas(agent=None):
+    """
+    Utility function.
+    Used to compute areas between nexuses and mineral lines.
+    
+    returns: List[MapArea]
+    """
+    bad_locations = []
+    for nexus in agent.units(NEXUS):
+        to_print = ""
+
+        min_x = 0
+        min_y = 0
+        max_x = 0
+        max_y = 0
+        flag = False
+        
+        for field in agent.state.mineral_field.closer_than(15.0, nexus):
+            x = field.position[0]
+            y = field.position[1]
+            if not flag:
+                min_x = x
+                max_x = x
+                min_y = y
+                max_y = y
+                flag = True
+                continue
+            if x > max_x:
+                max_x = x
+            elif x < min_x:
+                min_x = x
+            if y > max_y:
+                max_y = y
+            elif y < min_y:
+                min_y = y                
+
+        nexus_x = nexus.position[0]
+        nexus_y = nexus.position[1] 
+        if nexus_x > max_x:
+            max_x = nexus_x
+        elif nexus_x < min_x:
+            min_x = nexus_x
+        if nexus_y > max_y:
+            max_y = nexus_y
+        elif nexus_y < min_y:
+            min_y = nexus_y
+            
+        bad_area = MapArea(min_x-2, min_y-2, max_x+2, max_y+2)
+
+        bad_locations.append(bad_area)  
+    
+    return bad_locations                
+                #=====
+#./utils/notifier.py
+
+import threading
+import time
+class Notifier(threading.Thread):
+
+    """
+    Notifier object.
+    A Notifier runs in the background.
+    When the condition is met, the callback is executed.
+    The Notifier is killed after the callback executes
+    """
+    def __init__(self, condition, callback):
+        print("Started notifier")
+        super(Notifier, self).__init__()
+        self.condition = condition
+        self.callback  = callback
+        
+
+    def run(self):
+        while True:
+            ready = self.condition()
+            if ready:
+                print("Ready to notify")
+                self.callback()
+                break
+            else:
+                time.sleep(2)
+        print("Killing notifier")        
+
+#=====
+#./utils/units.py
+
+from .constants import *
+from .logic import getLogic
+#import sc2.constants
+
+class Units():
+
+    """
+    Repository for units information.
+    """
+    def initialize(self, logic):
+        self.logic = logic
+        
+        self.protossUnits = self.get_protoss_units()
+        self.terran_units = self.get_terran_units()
+
+        self.protoss_drawing_order = self.generate_protoss_drawing_order()
+        self.terran_drawing_order  = self.generate_terran_drawing_order()
+
+    def set_agent(self, agent):
+        self.agent = agent
+
+    def generate_protoss_drawing_order(self):
+        """
+        Generates an order to draw the units in the visualizer.
+        Bigger units first, smaller after so that things are not covered by each other.
+        """
+        final_order = []
+        for unit_type in self.protossUnits:
+            if len(final_order) == 0:
+                final_order.append(unit_type)
+            else:    
+                size = self.protossUnits[unit_type]["visualization"]["size"]
+                for i, e in enumerate(final_order):
+                    inserted = False
+                    other_size = self.protossUnits[e]["visualization"]["size"]
+                    if other_size <= size:
+                        final_order.insert(i, unit_type)
+                        inserted = True
+                        break
+                if not inserted:
+                    final_order.append(unit_type)     
+        return final_order                          
+            
+
+    def generate_terran_drawing_order(self):
+        """
+        Generates an order to draw the units in the visualizer.
+        Bigger units first, smaller after so that things are not covered by each other.
+        """
+        final_order = []
+        for unit_type in self.terran_units:
+            if len(final_order) == 0:
+                final_order.append(unit_type)
+            else:    
+                size = self.terran_units[unit_type]["visualization"]["size"]
+                for i, e in enumerate(final_order):
+                    inserted = False
+                    other_size = self.terran_units[e]["visualization"]["size"]
+                    if other_size <= size:
+                        final_order.insert(i, unit_type)
+                        inserted = True
+                        break
+                if not inserted:
+                    final_order.append(unit_type)        
+        return final_order                          
+
+
+    def get_protoss_units(self):
+        """
+        Returns a dictionary with information about each Protoss unit.
+        Each entry has the following fields:
+            type:      unit/structure
+            supply:    amount of army supply the unit costs
+            counters:  set of units that counter the unit (currently not used)
+            builtIn:   id of the structure where the unit is built
+            buildFunction:  function to build the unit, references the logic object
+            canBuildFunction: function that returns True if the unit can be built, references the logic object
+            warpAbilityId: Id of the warp action if the unit can be warped
+            required:  required tech to build the unit
+            visualization: information to draw the unit in the visualizer
+
+
+        """
+        return {
+            PROBE: {
+                "type": "unit",
+                "supply": 1,
+                "counters": set([]),
+                "builtIn": NEXUS,
+                "canBuildFunction": lambda: self.logic.can_build(PROBE),
+                "required": None,
+                "visualization": {
+                    "color": (100, 200, 0), # BGR
+                    "size": 1
+                }
+            }, 
+            ZEALOT : {
+                "type": "unit",
+                "supply": 2,
+                "counters": set([MARINE, HELLION]),
+                "builtIn": GATEWAY,
+                "buildFunction": lambda: self.logic.build_gateway_unit(ZEALOT),
+                "canBuildFunction": lambda: self.logic.can_build(ZEALOT),
+                "warpAbilityId": AbilityId.WARPGATETRAIN_ZEALOT,
+                "required": None,
+                "visualization": {
+                    "color": (40, 176, 0),
+                    "size": 1
+                }
+            },
+            ADEPT: {
+                "type": "unit",
+                "supply": 2,
+                "counters": set([MARAUDER, SIEGETANK, CYCLONE]),
+                "builtIn": GATEWAY,
+                "buildFunction": lambda: self.logic.build_gateway_unit(ADEPT),
+                "canBuildFunction": lambda: self.logic.can_build(ADEPT),
+                "warpAbilityId": None,
+                "required": CYBERNETICSCORE,
+                "visualization": {
+                    "color": (50, 210, 0),
+                    "size": 1
+                }
+            },
+            SENTRY: {
+                "type": "unit",
+                "supply": 2,
+                "counters": set([HELLION, BANSHEE, SIEGETANK]),
+                "builtIn": GATEWAY,
+                "buildFunction": lambda: self.logic.build_gateway_unit(SENTRY),
+                "canBuildFunction": lambda: self.logic.can_build(SENTRY),
+                "warpAbilityId": AbilityId.WARPGATETRAIN_SENTRY,
+                "required": CYBERNETICSCORE,
+                "visualization": {
+                    "color": (148, 210, 0),
+                    "size": 1
+                }
+            },
+            STALKER: {
+                "type": "unit",
+                "supply": 2,
+                "counters": set([MARAUDER, SIEGETANK]),
+                "builtIn": GATEWAY,
+                "buildFunction": lambda: self.logic.build_gateway_unit(STALKER),
+                "canBuildFunction": lambda: self.logic.can_build(STALKER),
+                "warpAbilityId": AbilityId.WARPGATETRAIN_STALKER,
+                "required": CYBERNETICSCORE,
+                "visualization": {
+                    "color": (55, 230, 0),
+                    "size": 1
+                }
+            },
+            HIGHTEMPLAR: {
+                "type": "unit",
+                "supply": 2,
+                "counters": set([SIEGETANK, GHOST]),
+                "builtIn": GATEWAY,
+                "buildFunction": lambda: self.logic.build_gateway_unit(HIGHTEMPLAR),
+                "canBuildFunction": lambda: self.logic.can_build(HIGHTEMPLAR),
+                "warpAbilityId": AbilityId.WARPGATETRAIN_HIGHTEMPLAR,
+                "required": TEMPLARARCHIVE,
+                "visualization": {
+                    "color": (75, 230, 0),
+                    "size": 1
+                }
+            },
+            DARKTEMPLAR: {
+                "type": "unit",
+                "supply": 2,
+                "counters": set([SIEGETANK, BANSHEE]),
+                "builtIn": GATEWAY,
+                "buildFunction": lambda: self.logic.build_gateway_unit(DARKTEMPLAR),
+                "canBuildFunction": lambda: self.logic.can_build(DARKTEMPLAR),
+                "warpAbilityId": AbilityId.WARPGATETRAIN_DARKTEMPLAR,
+                "required": DARKSHRINE,
+                "visualization": {
+                    "color": (48, 144, 0),
+                    "size": 1
+                }
+            },
+            ARCHON: {
+                "type": "unit",
+                "supply": 0,
+                "counters": set([]),
+                "builtIn": None,
+                "canBuildFunction": self.logic.can_build_archon,
+                "required": TEMPLARARCHIVE,
+                "visualization": {
+                    "color": (247, 255, 169),
+                    "size": 2
+                }
+            },
+            IMMORTAL: {
+                "type": "unit",
+                "supply": 4,
+                "counters": set([MARINE, GHOST]),
+                "builtIn": ROBOTICSFACILITY,
+                "buildFunction": lambda: self.logic.build_unit(IMMORTAL),
+                "canBuildFunction": lambda: self.logic.can_build(IMMORTAL),
+                "required": None,
+                "visualization": {
+                    "color": (55, 250, 0),
+                    "size": 1
+                }
+            },
+            COLOSSUS: {
+                "type": "unit",
+                "supply": 6,
+                "counters": set([SIEGETANK, VIKING]),
+                "builtIn": ROBOTICSFACILITY,
+                "buildFunction": lambda: self.logic.build_unit(COLOSSUS),
+                "canBuildFunction": lambda: self.logic.can_build(COLOSSUS),
+                "required": ROBOTICSBAY,
+                "visualization": {
+                    "color": (105, 208, 0),
+                    "size": 2
+                }
+            },
+            OBSERVER: {
+                "type": "unit",
+                "supply": 1,
+                "counters": set([]),
+                "builtIn": ROBOTICSFACILITY,
+                "buildFunction": lambda: self.logic.build_unit(OBSERVER),
+                "canBuildFunction": lambda: self.logic.can_build(OBSERVER),
+                "required": ROBOTICSFACILITY,
+                "visualization": {
+                    "color": (255, 255, 255),
+                    "size": 1
+                }
+            },
+            NEXUS: {
+                "type": "structure",
+                "buildFunction": self.logic.build_structure,
+                "required": None,
+                "visualization": {
+                    "color": (0, 255, 0),
+                    "size": 15
+                }
+            },
+            PYLON: {
+                "type": "structure",
+                "buildFunction": self.logic.build_structure,
+                "canBuildFunction": lambda: self.agent.units(NEXUS).ready.exists,
+                "required": NEXUS,
+                "visualization": {
+                    "color": (20, 235, 0),
+                    "size": 2
+                }
+            },
+            ASSIMILATOR:{
+                "type": "structure",
+                "buildFunction": self.logic.build_structure,
+                "required": NEXUS,
+                "visualization": {
+                    "color": (55, 200, 0),
+                    "size": 2
+                }
+            },
+            GATEWAY: {
+                "type": "structure",
+                "buildFunction": self.logic.build_structure,
+                "canBuildFunction": lambda: self.agent.units(PYLON).ready.exists,
+                "required": PYLON,
+                "visualization": {
+                    "color": (200, 100, 0),
+                    "size": 2
+                }                
+            },
+            FORGE: {
+                "type": "structure",
+                "buildFunction": self.logic.build_structure,
+                "required": PYLON,
+                "visualization": {
+                    "color": (170, 150, 0),
+                    "size": 2
+                } 
+            },
+            CYBERNETICSCORE: {
+                "type": "structure",
+                "buildFunction": self.logic.build_structure,
+                "canBuildFunction": lambda: self.agent.units(GATEWAY).ready.exists,
+                "required": GATEWAY,
+                "visualization": {
+                    "color": (150, 150, 0),
+                    "size": 2
+                } 
+            },
+            SHIELDBATTERY: {
+                "type": "structure",
+                "buildFunction": self.logic.build_structure,
+                "required": CYBERNETICSCORE,
+                "visualization": {
+                    "color": (100, 150, 0),
+                    "size": 2
+                } 
+            },
+            PHOTONCANNON: {
+                "type": "structure",
+                "buildFunction": self.logic.build_structure,
+                "required": FORGE,
+                "visualization": {
+                    "color": (200, 250, 0),
+                    "size": 2
+                } 
+            },
+            TWILIGHTCOUNCIL: {
+                "type": "structure",
+                "buildFunction": self.logic.build_structure,
+                "required": CYBERNETICSCORE,
+                "visualization": {
+                    "color": (200, 170, 0),
+                    "size": 2
+                } 
+            },
+            ROBOTICSFACILITY: {
+                "type": "structure",
+                "buildFunction": self.logic.build_structure,
+                "canBuildFunction": lambda: self.agent.units(CYBERNETICSCORE).ready.exists,
+                "required": CYBERNETICSCORE,
+                "visualization": {
+                    "color": (215, 155, 0),
+                    "size": 2
+                } 
+            },
+            STARGATE: {
+                "type": "structure",
+                "buildFunction": self.logic.build_structure,
+                "required": CYBERNETICSCORE,
+                "visualization": {
+                    "color": (255, 0, 0),
+                    "size": 2
+                } 
+            },
+            TEMPLARARCHIVE: {
+                "type": "structure",
+                "buildFunction": self.logic.build_structure,
+                "required": TWILIGHTCOUNCIL,
+                "visualization": {
+                    "color": (210, 180, 0),
+                    "size": 2
+                } 
+            },
+            DARKSHRINE: {
+                "type": "structure",
+                "buildFunction": self.logic.build_structure,
+                "required": TWILIGHTCOUNCIL,
+                "visualization": {
+                    "color": (180, 100, 0),
+                    "size": 2
+                } 
+            },
+            ROBOTICSBAY: {
+                "type": "structure",
+                "buildFunction": self.logic.build_structure,
+                "canBuildFunction": lambda: self.agent.units(ROBOTICSFACILITY).ready.exists, 
+                "required": ROBOTICSFACILITY,
+                "visualization": {
+                    "color": (235, 185, 0),
+                    "size": 2
+                } 
+            },
+            FLEETBEACON: {
+                "type": "structure",
+                "buildFunction": self.logic.build_structure, # TODO lambda: self.logic.build_structure(STRUCTURE) ..
+                "required": STARGATE,
+                "visualization": {
+                    "color": (275, 0, 0),
+                    "size": 2
+                } 
+            }
+        }    
+    def get_terran_units(self):
+        """
+        Same as get_protoss_units, but with less information.
+
+        Each entry has the following fields:
+            counters: set of unit counters (currently not used)
+            visualization: information to draw the unit with the visualizer
+        """
+        return {
+            SCV: {
+                "counters": set(),
+                "visualization":{
+                    "color": (55, 0, 200),
+                    "size": 1
+                }
+            },
+            MULE: {
+                "counters": set(),
+                "visualization":{
+                    "color": (65, 0, 210),
+                    "size": 1
+                }
+            },
+            MARINE: {
+                "counters": set([COLOSSUS]),
+                "visualization":{
+                    "color": (55, 0, 155),
+                    "size": 1
+                }
+            },
+            MARAUDER: {
+                "counters": set([IMMORTAL, VOIDRAY, ZEALOT]),
+                "visualization":{
+                    "color": (55, 0, 175),
+                    "size": 1
+                }
+            },
+            REAPER: {
+                "counters": set([STALKER]),
+                "visualization":{
+                    "color": (35, 0, 155),
+                    "size": 1
+                }
+            },
+            GHOST: {
+                "counters": set([STALKER]),
+                "visualization":{
+                    "color": (55, 0, 185),
+                    "size": 1
+                }
+            },
+            HELLION: {
+                "counters": set([STALKER]),
+                "visualization":{
+                    "color": (35, 0, 135),
+                    "size": 1
+                }
+            },
+            SIEGETANK: {
+                "counters": set([IMMORTAL, VOIDRAY]),
+                "visualization":{
+                    "color": (25, 0, 105),
+                    "size": 1
+                }
+            },
+            THOR: {
+                "counters": set([IMMORTAL]),
+                "visualization":{
+                    "color": (0, 0, 105),
+                    "size": 1
+                }
+            },
+            BANSHEE: {
+                "counters": set([VOIDRAY]),
+                "visualization":{
+                    "color": (100, 0, 200),
+                    "size": 1
+                }           
+            },
+            VIKING: {
+                "counters": set([STALKER]),
+                "visualization":{
+                    "color": (100, 0, 180),
+                    "size": 1
+                }  
+            },
+            VIKINGFIGHTER: {
+                "counters": set([STALKER]),
+                "visualization":{
+                    "color": (110, 0, 190),
+                    "size": 1
+                }  
+            },
+            RAVEN: {
+                "counters": set([STALKER]),
+                "visualization":{
+                    "color": (141, 0, 235),
+                    "size": 1
+                }  
+            },
+            MEDIVAC: {
+                "counters": set([STALKER, VOIDRAY]),
+                "visualization":{
+                    "color": (141, 0, 255),
+                    "size": 1
+                } 
+            },
+            BATTLECRUISER: {
+                "counters": set([VOIDRAY]),
+                "visualization":{
+                    "color": (0, 0, 255),
+                    "size": 1
+                }
+            }
+        }
+
+        
+
+units = Units()      
+initialized = False
+def initialize_units(logic):
+    units.initialize(logic) 
+
+def initialize_units_agent(agent):
+    units.set_agent(agent) 
+
+def getUnits():
+    """
+    Singleton pattern: returns the Units singleton object
+    """
+    return units
+#=====
+#./utils/__init__.py
+# Package Init file#=====
+#./utils/__pycache__
+#=====
+#./utils/__pycache__/constants.cpython-37.pyc
+#=====
+#./utils/__pycache__/constants.cpython-38.pyc
+#=====
+#./utils/__pycache__/function_utils.cpython-37.pyc
+#=====
+#./utils/__pycache__/function_utils.cpython-38.pyc
+#=====
+#./utils/__pycache__/initializer.cpython-37.pyc
+#=====
+#./utils/__pycache__/initializer.cpython-38.pyc
+#=====
+#./utils/__pycache__/logic.cpython-37.pyc
+#=====
+#./utils/__pycache__/logic.cpython-38.pyc
+#=====
+#./utils/__pycache__/map_area.cpython-37.pyc
+#=====
+#./utils/__pycache__/notifier.cpython-37.pyc
+#=====
+#./utils/__pycache__/notifier.cpython-38.pyc
+#=====
+#./utils/__pycache__/plan.cpython-38.pyc
+#=====
+#./utils/__pycache__/units.cpython-37.pyc
+#=====
+#./utils/__pycache__/units.cpython-38.pyc
+#=====
+#./utils/__pycache__/__init__.cpython-37.pyc
+#=====
+#./utils/__pycache__/__init__.cpython-38.pyc
+#=====
+#./__init__.py
+# Package Init file#=====
+#./__pycache__
+#=====
+#./__pycache__/__init__.cpython-37.pyc
+#=====
+#./__pycache__/__init__.cpython-38.pyc

@@ -13,6 +13,7 @@ class Visualizer:
         self.units_info      = getUnits()
         self.visual_data     = None
         self.military_weight = 0
+        self.bad_areas       = []
 
     @agent_method
     def compute_military_weight(self, agent=None):
@@ -104,7 +105,7 @@ class Visualizer:
                 cv2.circle(self.game_data, (int(pos[0]), int(pos[1])), size, color, -1)
 
         self.draw_mineral_fields()    
-        #self.draw_resources()
+        self.draw_bad_areas()
 
         # flip horizontally to make our final fix in visual representation:
         self.visual_data = cv2.flip(self.game_data, 0)
@@ -114,6 +115,19 @@ class Visualizer:
 
             cv2.imshow('Visual Data', resized)
             cv2.waitKey(1)
+
+    def draw_bad_areas(self):
+        for area in self.bad_areas:
+            for pos in area:
+                cv2.circle(self.game_data, (int(pos[0]), int(pos[1])), 2, (255, 0, 0), -1)       
+
+
+    def set_bad_areas(self, bad_areas):
+        self.bad_areas = bad_areas
+
+    @agent_method
+    def print_info_to_console(self, agent=None):
+        pass
 
 
 

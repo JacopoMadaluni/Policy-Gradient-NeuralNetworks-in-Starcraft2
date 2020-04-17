@@ -5,10 +5,26 @@ from .logic import getLogic
 
 class Units():
 
+    """
+    Repository for units information.
+    """
+    def initialize(self, logic):
+        self.logic = logic
+        
+        self.protossUnits = self.get_protoss_units()
+        self.terran_units = self.get_terran_units()
+
+        self.protoss_drawing_order = self.generate_protoss_drawing_order()
+        self.terran_drawing_order  = self.generate_terran_drawing_order()
+
     def set_agent(self, agent):
         self.agent = agent
 
     def generate_protoss_drawing_order(self):
+        """
+        Generates an order to draw the units in the visualizer.
+        Bigger units first, smaller after so that things are not covered by each other.
+        """
         final_order = []
         for unit_type in self.protossUnits:
             if len(final_order) == 0:
@@ -28,6 +44,10 @@ class Units():
             
 
     def generate_terran_drawing_order(self):
+        """
+        Generates an order to draw the units in the visualizer.
+        Bigger units first, smaller after so that things are not covered by each other.
+        """
         final_order = []
         for unit_type in self.terran_units:
             if len(final_order) == 0:
@@ -46,19 +66,22 @@ class Units():
         return final_order                          
 
 
-
-            
-
-    def initialize(self, logic):
-        self.logic = logic
-        
-        self.protossUnits = self.get_protoss_units()
-        self.terran_units = self.get_terran_units()
-
-        self.protoss_drawing_order = self.generate_protoss_drawing_order()
-        self.terran_drawing_order  = self.generate_terran_drawing_order()
-
     def get_protoss_units(self):
+        """
+        Returns a dictionary with information about each Protoss unit.
+        Each entry has the following fields:
+            type:      unit/structure
+            supply:    amount of army supply the unit costs
+            counters:  set of units that counter the unit (currently not used)
+            builtIn:   id of the structure where the unit is built
+            buildFunction:  function to build the unit, references the logic object
+            canBuildFunction: function that returns True if the unit can be built, references the logic object
+            warpAbilityId: Id of the warp action if the unit can be warped
+            required:  required tech to build the unit
+            visualization: information to draw the unit in the visualizer
+
+
+        """
         return {
             PROBE: {
                 "type": "unit",
@@ -77,8 +100,10 @@ class Units():
                 "supply": 2,
                 "counters": set([MARINE, HELLION]),
                 "builtIn": GATEWAY,
+                "buildFunction": lambda: self.logic.build_gateway_unit(ZEALOT),
                 "canBuildFunction": lambda: self.logic.can_build(ZEALOT),
-                "required": None,
+                "warpAbilityId": AbilityId.WARPGATETRAIN_ZEALOT,
+                "required": GATEWAY,
                 "visualization": {
                     "color": (40, 176, 0),
                     "size": 1
@@ -89,7 +114,9 @@ class Units():
                 "supply": 2,
                 "counters": set([MARAUDER, SIEGETANK, CYCLONE]),
                 "builtIn": GATEWAY,
+                "buildFunction": lambda: self.logic.build_gateway_unit(ADEPT),
                 "canBuildFunction": lambda: self.logic.can_build(ADEPT),
+                "warpAbilityId": CYBERNETICSCORE,
                 "required": CYBERNETICSCORE,
                 "visualization": {
                     "color": (50, 210, 0),
@@ -101,7 +128,9 @@ class Units():
                 "supply": 2,
                 "counters": set([HELLION, BANSHEE, SIEGETANK]),
                 "builtIn": GATEWAY,
+                "buildFunction": lambda: self.logic.build_gateway_unit(SENTRY),
                 "canBuildFunction": lambda: self.logic.can_build(SENTRY),
+                "warpAbilityId": AbilityId.WARPGATETRAIN_SENTRY,
                 "required": CYBERNETICSCORE,
                 "visualization": {
                     "color": (148, 210, 0),
@@ -113,7 +142,9 @@ class Units():
                 "supply": 2,
                 "counters": set([MARAUDER, SIEGETANK]),
                 "builtIn": GATEWAY,
+                "buildFunction": lambda: self.logic.build_gateway_unit(STALKER),
                 "canBuildFunction": lambda: self.logic.can_build(STALKER),
+                "warpAbilityId": AbilityId.WARPGATETRAIN_STALKER,
                 "required": CYBERNETICSCORE,
                 "visualization": {
                     "color": (55, 230, 0),
@@ -125,7 +156,9 @@ class Units():
                 "supply": 2,
                 "counters": set([SIEGETANK, GHOST]),
                 "builtIn": GATEWAY,
+                "buildFunction": lambda: self.logic.build_gateway_unit(HIGHTEMPLAR),
                 "canBuildFunction": lambda: self.logic.can_build(HIGHTEMPLAR),
+                "warpAbilityId": AbilityId.WARPGATETRAIN_HIGHTEMPLAR,
                 "required": TEMPLARARCHIVE,
                 "visualization": {
                     "color": (75, 230, 0),
@@ -137,7 +170,9 @@ class Units():
                 "supply": 2,
                 "counters": set([SIEGETANK, BANSHEE]),
                 "builtIn": GATEWAY,
+                "buildFunction": lambda: self.logic.build_gateway_unit(DARKTEMPLAR),
                 "canBuildFunction": lambda: self.logic.can_build(DARKTEMPLAR),
+                "warpAbilityId": AbilityId.WARPGATETRAIN_DARKTEMPLAR,
                 "required": DARKSHRINE,
                 "visualization": {
                     "color": (48, 144, 0),
@@ -161,8 +196,9 @@ class Units():
                 "supply": 4,
                 "counters": set([MARINE, GHOST]),
                 "builtIn": ROBOTICSFACILITY,
+                "buildFunction": lambda: self.logic.build_unit(IMMORTAL),
                 "canBuildFunction": lambda: self.logic.can_build(IMMORTAL),
-                "required": None,
+                "required": ROBOTICSFACILITY,
                 "visualization": {
                     "color": (55, 250, 0),
                     "size": 1
@@ -192,6 +228,19 @@ class Units():
                 "visualization": {
                     "color": (255, 255, 255),
                     "size": 1
+                }
+            },
+            CARRIER: {
+                "type": "unit",
+                "supply": 6,
+                "counters": set(),
+                "builtIn": STARGATE,
+                "buildFunction": lambda: self.logic.build_unit(CARRIER),
+                "canBuildFunction": lambda: self.logic.can_build(CARRIER),
+                "required": FLEETBEACON,
+                "visualization": {
+                    "color": (115, 208, 0),
+                    "size": 2
                 }
             },
             NEXUS: {
@@ -291,6 +340,7 @@ class Units():
             STARGATE: {
                 "type": "structure",
                 "buildFunction": self.logic.build_structure,
+                "canBuildFunction": lambda: self.agent.units(CYBERNETICSCORE).ready.exists, 
                 "required": CYBERNETICSCORE,
                 "visualization": {
                     "color": (255, 0, 0),
@@ -327,7 +377,8 @@ class Units():
             },
             FLEETBEACON: {
                 "type": "structure",
-                "buildFunction": self.logic.build_structure, # TODO lambda: self.logic.build_structure(STRUCTURE) ..
+                "buildFunction":  self.logic.build_structure,
+                "canBuildFunction": lambda: self.agent.units(STARGATE).ready.exists, 
                 "required": STARGATE,
                 "visualization": {
                     "color": (275, 0, 0),
@@ -336,6 +387,13 @@ class Units():
             }
         }    
     def get_terran_units(self):
+        """
+        Same as get_protoss_units, but with less information.
+
+        Each entry has the following fields:
+            counters: set of unit counters (currently not used)
+            visualization: information to draw the unit with the visualizer
+        """
         return {
             SCV: {
                 "counters": set(),
@@ -455,10 +513,7 @@ def initialize_units_agent(agent):
     units.set_agent(agent) 
 
 def getUnits():
+    """
+    Singleton pattern: returns the Units singleton object
+    """
     return units
-
-if __name__ == "__main__":
-    x = Units()
-    print(x.protossUnits)
-    f = x.protossUnits[ARCHON]["builtIn"]
-    print(f())

@@ -84,6 +84,6 @@ if __name__ == "__main__":
         del simulation
 
         if i%100 == 0:
-            save_info(agent, win_loss, simulation_dir)
+            save_info(score_history, agent, win_loss, simulation_dir)
 
-    save_info(agent, win_loss, simulation_dir)
+    save_info(score_history, agent, win_loss, simulation_dir)

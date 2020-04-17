@@ -4,4 +4,5 @@ n_actions: 4
 L1: 49
 L2: 49
 input_dims: 7
+namespace: -$$zealot,stalker,phoenix$$-
 Win ratio: 0.7165

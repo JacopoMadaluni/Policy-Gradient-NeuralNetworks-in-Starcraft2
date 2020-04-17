@@ -30,12 +30,11 @@ class Evaluator:
         self.composition = None
         self.evaluation  = None
 
-        
-
-     
+         
     def generate_enemy_army(self):
         index = random.randint(0, self.max_index+1)
         self.army = self.generator_functions[index]()
+        return self.army
 
 
     def submit_composition(self, composition):

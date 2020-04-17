@@ -8,11 +8,11 @@ from .NeuralNetworks import MultiLayerNN
 
 class PolicyGradientAgent(MultiLayerNN):
     def __init__(self, *args, **kwargs):
-
         super(PolicyGradientAgent, self).__init__(*args, **kwargs)
 
     def build_net(self):
         tf.disable_eager_execution()
+
         with tf.variable_scope('parameters'):
             self.input = tf.placeholder(tf.float32, shape=[None, self.input_dims], name='input')
             self.label = tf.placeholder(tf.int32, shape=[None, ], name='label')
@@ -34,6 +34,7 @@ class PolicyGradientAgent(MultiLayerNN):
         with tf.variable_scope('loss'):
             negative_log_probability = tf.nn.sparse_softmax_cross_entropy_with_logits(
                                                     logits=l3, labels=self.label)
+                                     
 
             loss = negative_log_probability * self.G
 

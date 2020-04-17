@@ -32,20 +32,6 @@ class Scouter:
                 return
         return None            
 
-            
-
-        #if self.map_scout is not None or self.map_scout == PROBE:
-         #   if agent.units(STALKER).exists:
-          #      stalker = random.choice(agent.units(STALKER))
-           #     self.map_scout = stalker
-        # Probe must be used
-        #elif self.map_scout is None:
-         #   if agent.units(PROBE).exists:
-          #      probe = random.choice(agent.units(PROBE))
-           #     self.map_scout = probe
-        #else:
-         #   return None    
-
     @agent_method
     def update_next_iteration(self, agent=None):
         delay = random.randrange(20, 165)
@@ -74,11 +60,14 @@ class PositionVariances:
         return position.Point2(position.Pointlike((x, y)))
 
     def random_enemy_start_location_variance(self, map_size, enemy_start_location):
-        x = enemy_start_location[0]
-        y = enemy_start_location[1]
+        return self.position_variance(map_size, enemy_start_location) 
 
-        x += ((random.randrange(-20, 20))/100) * enemy_start_location[0]
-        y += ((random.randrange(-20, 20))/100) * enemy_start_location[1]
+    def position_variance(self, map_size, position):
+        x = position[0]
+        y = position[1]
+
+        x += ((random.randrange(-20, 20))/100) * position[0]
+        y += ((random.randrange(-20, 20))/100) * position[1]
 
         if x < 0:
             x = 0
@@ -89,8 +78,8 @@ class PositionVariances:
         if y > map_size[1]:
             y = map_size[1]
 
-        go_to = self.position_of(x, y)
-        return go_to    
+        target = self.position_of(x, y)
+        return target       
 
     def random_position_in_map(self, map_size):
         x = random.randrange(map_size[0])
