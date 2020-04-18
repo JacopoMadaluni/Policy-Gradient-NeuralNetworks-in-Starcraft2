@@ -41,7 +41,4 @@ class Evaluator:
         """
         composition = [[type, amount], ...]
         """
-        self.composition = composition
-
-    def evaluate(self):
-        pass           
+        self.composition = composition   

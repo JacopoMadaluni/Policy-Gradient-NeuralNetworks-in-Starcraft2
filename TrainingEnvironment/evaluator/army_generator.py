@@ -73,8 +73,4 @@ def mech_army(size):
     n_thors    = math.floor(supply_each/terran_units[THOR]["supply"])
     n_vikings  = math.floor(supply_each/terran_units[VIKING]["supply"])
 
-    return [[HELLIONTANK, n_hellbats], [CYCLONE, n_cyclones], [SIEGETANK, n_tanks], [THOR, n_thors], [VIKING, n_vikings]]                
-
-
-if __name__ == "__main__":
-    print(bio_army(40))
+    return [[HELLIONTANK, n_hellbats], [CYCLONE, n_cyclones], [SIEGETANK, n_tanks], [THOR, n_thors], [VIKING, n_vikings]]

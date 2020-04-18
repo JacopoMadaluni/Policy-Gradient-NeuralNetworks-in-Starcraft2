@@ -45,6 +45,37 @@ Once the environment is successfully imported. Activate it with the following co
 On Windows: ```activate starcraft2_env```  <br />
 On Linux ```source activate starcraft2_env``` <br />
 
+#### Ensure that the library paths are correctly configured
+Once the Anaconda environment has been loaded, follow these steps.
+C:\Users\Jaco\Anaconda3\envs\FinalProjectTraining\Lib\site-packages\sc2
+- Go to the Anaconda folder (on Windows, the default is "C:\Users\USER\Anaconda3")
+- Once in the Anaconda folder go to envs\starcraft2_env\Lib\site-packages\sc2
+- In this folder there is a library file called "paths.py" that contains various pointers to the game paths. 
+- Make sure that the paths contained in the file match with the paths of your system. In particular:
+
+```
+BASEDIR = {
+    "Windows": "C:/Program Files (x86)/StarCraft II",  # Windows path to Starcraft II folder, change accordingly
+    "Darwin": "/Applications/StarCraft II",
+    "Linux": "~/StarCraftII",                          # Linux path to Starcraft II folder, change accordingly
+    "WineLinux": "~/.wine/drive_c/Program Files (x86)/StarCraft II",
+}
+
+USERPATH = {
+    "Windows": "\\Documents\\StarCraft II\\ExecuteInfo.txt",
+    "Darwin": "/Library/Application Support/Blizzard/StarCraft II/ExecuteInfo.txt",
+    "Linux": None,
+    "WineLinux": None,
+}
+
+BINPATH = {
+    "Windows": "SC2_x64.exe",   # Windows name for the Starcraft II binary executable. If default fails, change accordingly
+    "Darwin": "SC2.app/Contents/MacOS/SC2",
+    "Linux": "SC2_x64",         # Linux name for the Starcraft II binary executable. If default fails, change accordingly
+    "WineLinux": "SC2_x64.exe",
+}
+```
+
 ### Set up required Starcraft2 maps
 Assuming Starcraft2 is already installed in the system, the path to the folder should look something like this: <br />
 On windows: C:\Program Files (x86)\StarCraft II\ <br />
