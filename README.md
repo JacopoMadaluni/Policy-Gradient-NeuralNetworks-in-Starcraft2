@@ -1,14 +1,14 @@
 # User guide
-The project comes with two artifacts.
-The first runs the evaluator bot that plays Starcraft2.
-The second one can be used to train new policy gradients.
+The project comes with two artifacts. <br />
+The first runs the evaluator bot that plays Starcraft2. <br />
+The second one can be used to train new policy gradients. <br />
 
 ## Prerequisites to run the artifacts
 
 ### Install Starcraft2
-To run both the artifacts the Starcraft2 game is required.
-Every .zip file downloaded from the following github repository is password protected.
-The password is "iagreetotheeula". By typing that you will agree to the following AI and Machine Learning use license: http://blzdistsc2-a.akamaihd.net/AI_AND_MACHINE_LEARNING_LICENSE.html
+To run both the artifacts the Starcraft2 game is required. <br />
+Every .zip file downloaded from the following github repository is password protected. <br />
+The password is "iagreetotheeula". By typing that you will agree to the following AI and Machine Learning use license: http://blzdistsc2-a. akamaihd.net/AI_AND_MACHINE_LEARNING_LICENSE.html
 #### On windows
 - Download the full game for windows for free from the official Blizzard website https://starcraft2.com/en-gb/
 
@@ -16,7 +16,7 @@ On default settings, the game should be installed in the following location: C:\
 
 
 #### On linux
-Download the 4.7.1 linux version of Starcraft2 from the official repository https://github.com/Blizzard/s2client-proto#downloads
+Download the 4.7.1 linux version of Starcraft2 from the official repository https://github.com/Blizzard/s2client-proto#downloads <br />
 The linux version does not come with GUI so it won't be possible to see the interface of the game while the program is running.
 
 The linux version will be installed on whatever folder the .zip file was extracted to. (e.g /home/User/Starcraft II)
@@ -32,23 +32,23 @@ In order for the neural network to be loaded, NVIDIA Cuda 10.2 is required.
 
 
 ### Install Anaconda and set up virtual environment.
-Anaconda is used in this project to handle dependencies.
-Anaconda can be downloaded for both windows and linux on the official website: https://www.anaconda.com/distribution/
-Be sure to use the Python 3.7 version.
+Anaconda is used in this project to handle dependencies. <br />
+Anaconda can be downloaded for both windows and linux on the official website: https://www.anaconda.com/distribution/ <br />
+Be sure to use the Python 3.7 version. <br />
 Once Anaconda is successfully installed, import the environment by using:
 ```conda env create -f environment.yml``` on Linux or Gitbash on windows
 where the environment.yml file is the file contained in the same folder of this markdown.
-Alternatively, you can import the environment by going into the Anaconda navigator -> Environments -> Import.
-Select the same environment.yml file to be imported. 
-
-Once the environment is successfully imported. Activate it with the following command:
-On Windows: ```activate starcraft2_env``` 
-On Linux ```source activate starcraft2_env```
+Alternatively, you can import the environment by going into the Anaconda navigator -> Environments -> Import. <br />
+Select the same environment.yml file to be imported.  <br />
+<br />
+Once the environment is successfully imported. Activate it with the following command: <br />
+On Windows: ```activate starcraft2_env```  <br />
+On Linux ```source activate starcraft2_env``` <br />
 
 ### Set up required Starcraft2 maps
-Assuming Starcraft2 is already installed in the system, the path to the folder should look something like this:
-On windows: C:\Program Files (x86)\StarCraft II\
-On linux: /home/User/.../Starcraft II
+Assuming Starcraft2 is already installed in the system, the path to the folder should look something like this: <br />
+On windows: C:\Program Files (x86)\StarCraft II\ <br />
+On linux: /home/User/.../Starcraft II <br />
 
 - Download the Ladder 2017 Season 1 maps folder from https://github.com/Blizzard/s2client-proto#downloads
     Like stated before, the .zip is protected by the "iagreetotheeula" password.
@@ -56,30 +56,30 @@ On linux: /home/User/.../Starcraft II
 - Make sure that:
     - It exists a "Maps" (capital M) folder inside the StarCraft II folder. If it does not exist, create one.
     - Move the previously downloaded Ladder 2017 Season 1 folder and copy it into the "Maps" folder.
-It should now exist a folder "...\StarCraft II\Maps\Ladder2017Season1" containing the AbyssalReefLE.SC2Map file.    
+It should now exist a folder "...\StarCraft II\Maps\Ladder2017Season1" containing the AbyssalReefLE.SC2Map file.     
 
 
 - Create a folder "CustomMaps" (the name of this folder does not matter) inside the "Maps" folder. The following path should not exist: ...      \StarCraft II\Maps\CustomMaps
 - From the folder where this readme is contained go to TrainingEnvironment/maps. Inside the maps folder you should find a TraningEnvironment.SC2Map file. 
 - Copy the TraningEnvironment.SC2Map file and paste it into the "CustomMaps" folder.
 
-It should now exist a folder "...\StarCraft II\Maps\CustomMaps" containing the TraningEnvironment.SC2Map file.
+It should now exist a folder "...\StarCraft II\Maps\CustomMaps" containing the TraningEnvironment.SC2Map file. <br />
 This is the simulated environment where the neural network trains.
 
 
 ## First artifact - Training a new policy gradient
-To begin with, make sure that the virtual environment is active.
-From the main folder of this project, the first artifact can be executed with the following commands:
+To begin with, make sure that the virtual environment is active. <br />
+From the main folder of this project, the first artifact can be executed with the following commands: <br />
 - ```cd TrainingEnvironment```
 - ```python main_train```
-The console will ask for a save location. The save location refers to a folder contained in ./TrainingEnvironment/neural_training/checkpoints/
-If the location typed exists, the prompt will ask if the user wishes to load the already existing gradient. 
-If the location does not exist, a new gradient will be initialized. The prompt will ask the user to either keep the default settings or set new settings.
+The console will ask for a save location. The save location refers to a folder contained in ./TrainingEnvironment/neural_training/checkpoints/ <br />
+If the location typed exists, the prompt will ask if the user wishes to load the already existing gradient. <br />
+If the location does not exist, a new gradient will be initialized. The prompt will ask the user to either keep the default settings or set new settings. <br />
 
-After the gradient is initialized, the prompt will ask the user what kind of units the network can use. Feel free to randomly choose some of them, few of them, or all of them.
+After the gradient is initialized, the prompt will ask the user what kind of units the network can use. Feel free to randomly choose some of them, few of them, or all of them. <br />
 
-Once this is done, the prompt will ask how many episodes must be run.
-After inputting the number of episodes the training will start. Feel free to stop the process (CTRL+C), the progress is saved at the end of each episode.
+Once this is done, the prompt will ask how many episodes must be run. <br />
+After inputting the number of episodes the training will start. Feel free to stop the process (CTRL+C), the progress is saved at the end of each episode. <br />
 
 Example: 
 ```
@@ -138,14 +138,14 @@ How many simulations?
 
 
 ## Second artifact - Running the main agent
-This artifact will run the agent that plays a full game of Starcraft2, using a network to choose what units to employ.
-The artifacts can be run by running:
-```python main.py``` from the main folder (the one containing this file)
-The prompt will ask for the opponent difficulty [easy, medium, hard, vhard].
-After that, the prompt will ask if the game will be speed up. If yes ("y") the game will run as fast as possible.
-If no ("n") the game will run at human speed, making it easier (and slower) to watch the game being played.
-At last, the prompt will ask which network to load, either the default one, or a specific one inputted by the user.
-The input is expected to be the name of a folder inside ./TrainingEnvironment/neural_training/checkpoints/
+This artifact will run the agent that plays a full game of Starcraft2, using a network to choose what units to employ. <br />
+The artifacts can be run by running: <br />
+```python main.py``` from the main folder (the one containing this file) <br />
+The prompt will ask for the opponent difficulty [easy, medium, hard, vhard]. <br />
+After that, the prompt will ask if the game will be speed up. If yes ("y") the game will run as fast as possible. <br />
+If no ("n") the game will run at human speed, making it easier (and slower) to watch the game being played. <br />
+At last, the prompt will ask which network to load, either the default one, or a specific one inputted by the user. <br />
+The input is expected to be the name of a folder inside ./TrainingEnvironment/neural_training/checkpoints/ <br />
 Example: 
 ```
 Input difficulty [easy, medium, hard, vhard]
