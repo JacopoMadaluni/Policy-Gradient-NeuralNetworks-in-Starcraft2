@@ -27,10 +27,8 @@ class MainAgent(sc2.BotAI):
         self.intel = Intel(self)
         
     async def on_step(self, iteration):
-        try:
-            await self.intel.act(iteration)
-        except Exception:
-            print("Bad error occurred")    
+        await self.intel.act(iteration)
+
 
     def on_end(self, result):
         print("Game ended")

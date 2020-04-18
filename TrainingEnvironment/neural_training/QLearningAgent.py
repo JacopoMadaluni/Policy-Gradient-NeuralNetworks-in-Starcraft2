@@ -5,6 +5,9 @@ import ctypes
 from .NeuralNetworks import MultiLayerNN
 
 class QLearningAgent(MultiLayerNN):
+    """
+    Not currently used.
+    """
     def __init__(self, *args, **kwargs):
         super(QLearningAgent, self).__init__(*args, **kwargs)
         

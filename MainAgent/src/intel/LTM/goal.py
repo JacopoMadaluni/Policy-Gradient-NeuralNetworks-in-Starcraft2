@@ -48,7 +48,7 @@ class Goal:
             return
         next_goal = self.plan[-1]
 
-        if agent.units_info(next_goal).ready.exists:
+        if agent.units(next_goal).ready.exists:
             self.plan.pop()
             return
 
