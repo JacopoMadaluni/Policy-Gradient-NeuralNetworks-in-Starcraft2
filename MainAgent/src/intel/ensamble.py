@@ -20,7 +20,10 @@ class GradientEnsamble:
         self.gradients = []
         for name in gradient_names:
             # load gradient
-            self.gradients.append(load_policy_gradient(name, "TrainingEnvironment/"))
+            try:
+                self.gradients.append(load_policy_gradient(name, "TrainingEnvironment/"))
+            except FileNotFoundError as e:
+                raise FileNotFoundError("Gradient folder {} does not exist. Aborting.".format(name))    
 
         print("Initialized gradients: {}".format(gradient_names))    
 

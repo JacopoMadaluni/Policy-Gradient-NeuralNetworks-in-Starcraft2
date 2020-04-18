@@ -98,15 +98,23 @@ def get_initial_namespace():
     while ok != "y":
         namespace = []
         for name in dictt:
-            if input("Use {}? [y/n]\n>".format(name)) == "y":
+            if input("Use {}? [y/n]\n> ".format(name)) == "y":
                 namespace.append(dictt[name])
         print("Initialized following namespace: {}".format(namespace))
-        ok = input("Proceed? [y/n]")
+        ok = input("Proceed? [y/n]\n> ")
 
     serialized = serialize_namespace(namespace)
     return namespace, serialized
 
-
+def get_new_network_settings_from_user():
+    s = "Do you want to use the following default settings? [y/n]\n - alpha = 0.01\n - gamma = 0.99\n - layer 1 and 2 size = 128\n> "
+    alpha, gamma, l1, l2 = 0.01, 0.99, 128, 128
+    if input(s).lower() != "y":
+        alpha = float(input("Input learning ratio alpha (suggested: 0.01)\n> "))
+        gamma = float(input("Input discount factor gamma (0 <= gamma < 1)\n> "))
+        l1 = int(input("Input number of first hidden layer neurons (best: 128)\n> "))
+        l2 = int(input("Input number of second hidden layer neurons (best: 128)\n> "))
+    return alpha, gamma, l1, l2
 
 def save_info(score_history, agent, win_loss, save_dir):
     win_ratio = (win_loss[0]/(win_loss[0]+win_loss[1]))

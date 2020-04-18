@@ -40,11 +40,14 @@ if __name__ == "__main__":
         print(agent)
 
     else:
+        alpha, gamma, l1, l2 = get_new_network_settings_from_user()
+
         namespace, namespace_serialized = get_initial_namespace()
         n_actions = len(namespace)
         input_dims = 1 + n_actions + n_active_terran_units()
-        agent = PolicyGradientAgent(ALPHA=0.01, input_dims=input_dims, GAMMA=0.99,
-                                n_actions=n_actions, layer1_size=128, layer2_size=128,
+
+        agent = PolicyGradientAgent(ALPHA=alpha, input_dims=input_dims, GAMMA=gamma,
+                                n_actions=n_actions, layer1_size=l1, layer2_size=l2,
                                 chkpt_dir=simulation_dir, action_namespace=namespace_serialized)
 
     score_history = []

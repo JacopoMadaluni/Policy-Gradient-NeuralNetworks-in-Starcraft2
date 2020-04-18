@@ -1,0 +1,8 @@
+ALPHA: 0.01
+GAMMA: 0.99
+n_actions: 10
+L1: 128
+L2: 128
+input_dims: 25
+namespace: -$$zealot,sentry,adept,ht,dt,colossus,phoenix,voidray,tempest,carrier$$-
+Win ratio: 1.0

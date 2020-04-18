@@ -24,6 +24,12 @@ class Intel:
     This class manages everything that the agent does at each step.
     """
     def __init__(self, agent):
+        gradient_folder = "128_128_hard_no_air_6_highrewards"
+        if input("The default trained network will be used by default. Do you want to change it? [y/n]\n> ").lower() == "y":
+            gradient_folder = input("Please specify the name of the gradient folder (case sensitive)\n> ")
+
+
+
         self.agent = agent             # Library Agent object
         self.units_info = getUnits()   # Units info
         
@@ -36,13 +42,14 @@ class Intel:
             2: self.attack_mode
         }
 
+
         self.bad_locations = []        # No build locations.
 
         self.memory     = Memory()     # LTM core
         self.visualizer = Visualizer() # Visualizer (useful when running headless on linux)
         self.scouter    = Scouter()    # Scouter class
         self.belief     = Belief()     # Belief class
-        self.ensamble   = GradientEnsamble(["128_128_hard_no_air_6_highrewards"]) # Neural networks
+        self.ensamble   = GradientEnsamble([gradient_folder]) # Neural networks
 
         self.attacking = False 
         self.grouped   = False
