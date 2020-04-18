@@ -8,7 +8,7 @@ The second one can be used to train new policy gradients. <br />
 ### Install Starcraft2
 To run both the artifacts the Starcraft2 game is required. <br />
 Every .zip file downloaded from the following github repository is password protected. <br />
-The password is "iagreetotheeula". By typing that you will agree to the following AI and Machine Learning use license: http://blzdistsc2-a. akamaihd.net/AI_AND_MACHINE_LEARNING_LICENSE.html
+The password is "iagreetotheeula". By typing that you will agree to the following AI and Machine Learning use license: http://blzdistsc2-a.akamaihd.net/AI_AND_MACHINE_LEARNING_LICENSE.html
 #### On windows
 - Download the full game for windows for free from the official Blizzard website https://starcraft2.com/en-gb/
 
