@@ -1,8 +1,0 @@
-ALPHA: 0.1
-GAMMA: 1.0
-n_actions: 6
-L1: 4
-L2: 4
-input_dims: 21
-namespace: -$$sentry,stalker,adept,ht,colossus,carrier$$-
-Win ratio: 1.0

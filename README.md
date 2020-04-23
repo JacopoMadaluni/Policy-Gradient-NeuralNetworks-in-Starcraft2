@@ -45,11 +45,12 @@ Once the environment is successfully imported. Activate it with the following co
 On Windows: ```activate starcraft2_env```  <br />
 On Linux ```source activate starcraft2_env``` <br />
 
-#### Ensure that the library paths are correctly configured
+#### Ensure that the library and paths are correctly configured
 Once the Anaconda environment has been loaded, follow these steps. <br />
 - Go to the Anaconda folder (on Windows, the default is "C:\Users\USER\Anaconda3")
 - Once in the Anaconda folder go to envs\starcraft2_env\Lib\site-packages\sc2
-- In this folder there is a library file called "paths.py" that contains various pointers to the game paths. 
+- Substitute this folder entirely with the provided sc2 folder contained in the same folder of this file.
+- Once done that, in this folder there is a library file called "paths.py" that contains various pointers to the game paths. 
 - Make sure that the paths contained in the file match with the paths of your system. In particular:
 
 ```
